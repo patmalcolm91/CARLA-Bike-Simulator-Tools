@@ -29,9 +29,11 @@ import carla
 from carla import ColorConverter as cc
 
 import time
+import yaml
 import argparse
 import logging
-import weakref
+
+from .CameraManager import CameraManager
 
 try:
     import pygame
@@ -55,10 +57,10 @@ except ImportError:
 # restart() was stripped of all functions except to create a CameraManager
 
 class World(object):
-    def __init__(self, carla_world, args, cameraAdjustments):
+    def __init__(self, carla_world, args):
         self.world = carla_world
-        self.displaysize = (args.dis_width, args.dis_height)
-        self.resolution = (args.res_width, args.res_height)
+        self.display_size = args.display_size
+        self.resolution = args.resolution
 
         self.player = None
         for actor in self.world.get_actors():
@@ -66,13 +68,13 @@ class World(object):
                 self.player = actor
                 break
         self.camera_manager = None
-        self._gamma = args.gamma
-        self.restart(cameraAdjustments)
+        self.camera_params = {k: args[k] for k in CameraManager.DEFAULT_PARAMS}
+        self.restart()
 
-    def restart(self, cameraAdjustments):
+    def restart(self):
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
-        self.camera_manager = CameraManager(self.player, self._gamma, self.resolution, self.displaysize, cameraAdjustments)
+        self.camera_manager = CameraManager(self.player, **self.camera_params)
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index)
 
@@ -102,84 +104,7 @@ class World(object):
 
     @staticmethod
     def _is_quit_shortcut(key):
-        return (key == K_ESCAPE)
-
-
-# ==============================================================================
-# -- CameraManager -------------------------------------------------------------
-# ==============================================================================
-# Decoupling of surface resolution and display size has been implemented.
-# The camera Transform has been adjusted to the right screen
-
-
-class CameraManager(object):
-    def __init__(self, parent_actor, gamma_correction, resolution, displaysize, cameraAdjustments):
-        self.sensor = None
-        self.surface = None
-        self._parent = parent_actor
-        self.displaysize = displaysize
-        self.resolution = resolution
-        bound_y = 0.5 + self._parent.bounding_box.extent.y
-        Attachment = carla.AttachmentType
-        self._camera_transforms = [
-            (carla.Transform(carla.Location(x=0.3, z=1.7), carla.Rotation(yaw=cameraAdjustments["rotation"])), Attachment.Rigid)]
-        self.transform_index = 1
-        self.sensors = [
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}],
-        ]
-        world = self._parent.get_world()
-        bp_library = world.get_blueprint_library()
-        for item in self.sensors:
-            bp = bp_library.find(item[0])
-            if item[0].startswith('sensor.camera'):
-
-                # set field of view and surface resolution
-                bp.set_attribute('fov', str(cameraAdjustments["fov"]))
-                bp.set_attribute('image_size_x', str(self.resolution[0]))
-                bp.set_attribute('image_size_y', str(self.resolution[1]))
-
-                if bp.has_attribute('gamma'):
-                    bp.set_attribute('gamma', str(gamma_correction))
-                for attr_name, attr_value in item[3].items():
-                    bp.set_attribute(attr_name, attr_value)
-            item.append(bp)
-        self.index = None
-
-    def set_sensor(self, index, force_respawn=False):
-        index = index % len(self.sensors)
-        needs_respawn = True if self.index is None else \
-            (force_respawn or (self.sensors[index][2] != self.sensors[self.index][2]))
-        if needs_respawn:
-            if self.sensor is not None:
-                self.sensor.destroy()
-                self.surface = None
-            self.sensor = self._parent.get_world().spawn_actor(
-                self.sensors[index][-1],
-                self._camera_transforms[self.transform_index][0],
-                attach_to=self._parent,
-                attachment_type=self._camera_transforms[self.transform_index][1])
-            # We need to pass the lambda a weak reference to self to avoid
-            # circular reference.
-            weak_self = weakref.ref(self)
-            self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
-        self.index = index
-
-    def render(self, display):
-        if self.surface is not None:
-            # scale surface to display size
-            display.blit(pygame.transform.scale(self.surface, self.displaysize), (0, 0))
-
-    @staticmethod
-    def _parse_image(weak_self, image):
-        self = weak_self()
-        if not self:
-            return
-        image.convert(self.sensors[self.index][1])
-        array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-        array = np.reshape(array, (image.height, image.width, 4))
-        array = array[:, :, :3]
-        array = array[:, :, ::-1]
-        self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+        return key == K_ESCAPE
 
 
 # ==============================================================================
@@ -194,37 +119,25 @@ def game_loop(args):
     pygame.init()
     pygame.font.init()
     world = None
-
-    refreshrate = int(args.refresh)
-
-    # displaysize will be screen size
-    displaysize = (args.dis_width, args.dis_height)
+    refresh_rate = int(args.refresh_rate)
+    display_size = args.display_size
 
     try:
+        logging.info('listening to server %s:%s', args.host, args.port)
         client = carla.Client(args.host, args.port)
         client.set_timeout(2.0)
 
-        camera_adjustments = {"fov":70, "rotation":0}
-        if args.pos == "Left":
-            os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (1920, 0)
-            camera_adjustments["rotation"] = -70
-        elif args.pos == "Right":
-            os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (5760, 0)
-            camera_adjustments["rotation"] = 70
-        elif args.pos == "Rear":
-            os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (0, 0)
-            camera_adjustments["fov"] = 62
-            camera_adjustments["rotation"] = -136
+        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % tuple(args.window_pos)
 
         display = pygame.display.set_mode(
-            displaysize,
+            display_size,
             pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.NOFRAME)
 
-        world = World(client.get_world(), args, camera_adjustments)
+        world = World(client.get_world(), args)
 
         clock = pygame.time.Clock()
         while True:
-            clock.tick_busy_loop(refreshrate)
+            clock.tick_busy_loop(refresh_rate)
             if world.parse_events():
                 return
             world.render(display)
@@ -264,12 +177,12 @@ def main():
         type=int,
         help='TCP port to listen to (default: 2000)')
     argparser.add_argument(
-        '--res',
+        '--resolution',
         metavar='WIDTHxHEIGHT',
-        default='960x540',
+        default='1280x720',
         help='window resolution (default: 1280x720)')
     argparser.add_argument(
-        '--dis',
+        '--display_size',
         metavar='WIDTHxHEIGHT',
         default='1920x1080',
         help='display size (default: 1920x1080)')
@@ -289,35 +202,46 @@ def main():
         default=0,
         help='wait for hero vehicle to launch')
     argparser.add_argument(
-        '--refresh',
-        metavar='refreshrate',
+        '--refresh_rate',
+        metavar='refresh_rate',
         default=20,
         help='refresh rate of clients')
     argparser.add_argument(
-        '--pos',
-        metavar='position',
-        choices=("Left", "Right", "Rear"),
-        help='position of additonal display')
+        '--config',
+        type=str,
+        help='Path to YAML config file containing display settings.')
+    argparser.add_argument(
+        '--display_name',
+        metavar='display_name',
+        help='Name of display. Used to get parameters from config file.')
     args = argparser.parse_args()
 
-    args.res_width, args.res_height = [int(x) for x in args.res.split('x')]
-    args.dis_width, args.dis_height = [int(x) for x in args.dis.split('x')]
+    if args.config is not None:
+        # read config file
+        with open(args.config) as f:
+            cfg = yaml.load(f, Loader=yaml.Loader)
+        cfg_default_params = cfg.get("default", {})
+        cfg_display_params = cfg.get(args.display_name, {})
+        cfg_params = {**cfg_default_params, **cfg_display_params}
+        # set parameters
+        args.resolution = cfg_params.pop("resolution", args.resolution)
+        args.display_size = cfg_params.pop("display_size", args.display_size)
+        for param in cfg_params:
+            setattr(args, param, cfg_params[param])
+
+    args.resolution = tuple([int(x) for x in args.resolution.split('x')])
+    args.display_size = tuple([int(x) for x in args.display_size.split('x')])
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
 
-    logging.info('listening to server %s:%s', args.host, args.port)
-
     print(__doc__)
 
     try:
-
         game_loop(args)
-
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
 
 
 if __name__ == '__main__':
-
     main()

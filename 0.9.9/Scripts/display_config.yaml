@@ -1,0 +1,28 @@
+# Display configuration file
+default:
+  display_size: 1920x1080
+  camera_x: 0.3
+  camera_y: 0.0
+  camera_z: 1.7
+  camera_roll: 0
+  camera_pitch: 0
+  fov: 70
+  gamma: 2.2
+  refresh_rate: 20
+center:
+  resolution: 1280x720
+  window_pos: [3840, 0]
+  camera_yaw: 0
+left:
+  resolution: 960x540
+  window_pos: [1920, 0]
+  camera_yaw: -70
+right:
+  resolution: 960x540
+  window_pos: [5760, 0]
+  camera_yaw: 70
+left_rear:
+  resolution: 800x450
+  window_pos: [0, 0]
+  fov: 62
+  camera_yaw: 136

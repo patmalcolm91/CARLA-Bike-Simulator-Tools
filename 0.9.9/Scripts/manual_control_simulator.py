@@ -52,6 +52,7 @@ import carla
 from carla import ColorConverter as cc
 
 import argparse
+import yaml
 import collections
 import datetime
 import logging
@@ -59,6 +60,8 @@ import math
 import random
 import re
 import weakref
+
+from .CameraManager import CameraManager
 
 if sys.version_info >= (3, 0):
 
@@ -122,6 +125,7 @@ def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
+
 # ==============================================================================
 # -- Arduino -------------------------------------------------------------------
 # ==============================================================================
@@ -156,10 +160,11 @@ class Arduino(object):
 # Blueprint or apply the new engine setup, respectively. The new engine setup
 # has been added to restart().
 
+
 class World(object):
     def __init__(self, carla_world, hud, args):
         self.world = carla_world
-        self.displaysize = (args.dis_width, args.dis_height) # set up correct disply size for CameraManager
+        self.display_size = (args.dis_width, args.dis_height) # set up correct disply size for CameraManager
         self.resolution = (args.res_width, args.res_height) # set up the correct resolution for CameraManager
         self.actor_role_name = args.rolename # allow to use a custom player name
 
@@ -181,11 +186,11 @@ class World(object):
         self._weather_presets = find_weather_presets()
         self._weather_index = 0
         self._actor_filter = args.filter
-        self._gamma = args.gamma
-        self.restart(bike = True, engine = True) # On World instantiation use bicycle and new engine setup
+        self.restart(bike=True, engine=True) # On World instantiation use bicycle and new engine setup
         self.world.on_tick(hud.on_world_tick)
+        self.camera_params = {k: args[k] for k in CameraManager.DEFAULT_PARAMS}
 
-    def restart(self, bike = False, engine = False):
+    def restart(self, bike=False, engine=False):
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
@@ -216,7 +221,7 @@ class World(object):
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
-        self.camera_manager = CameraManager(self.player, self._gamma, self.resolution, self.displaysize)
+        self.camera_manager = CameraManager(self.player, **self.camera_params)
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
@@ -302,9 +307,6 @@ class DualControl(object):
             raise NotImplementedError("Actor type not supported")
         self._steer_cache = 0.0
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
-
-
-
 
     def parse_events(self, world, clock, arduino):
         for event in pygame.event.get():
@@ -728,118 +730,6 @@ class GnssSensor(object):
 
 
 # ==============================================================================
-# -- CameraManager -------------------------------------------------------------
-# ==============================================================================
-# CameraManager was updated to decouple display size and resolution. Therefore
-# it now takes 'resolution' and 'displaysize' as new inputs. The _camera_transform
-# list has been changed to launch the module in a first-person-view where the
-# camera position is located in front of the face of the bicycle rider.
-# render() now scales the surface to display size when blitting the image.
-
-
-class CameraManager(object):
-    def __init__(self, parent_actor, hud, resolution, displaysize):
-        self.sensor = None
-        self.surface = None
-        self._parent = parent_actor
-        self.displaysize = displaysize
-        self.resolution = resolution
-        self.hud = hud
-        self.recording = False
-        self._camera_transforms = [
-            carla.Transform(carla.Location(x=0.3, z=1.7)),
-            carla.Transform(carla.Location(x=-5.5, z=2.8), carla.Rotation(pitch=-15))
-        ]
-        self.transform_index = 1
-        self.sensors = [
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB'],
-            ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)'],
-            ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)'],
-            ['sensor.camera.depth', cc.LogarithmicDepth, 'Camera Depth (Logarithmic Gray Scale)'],
-            ['sensor.camera.semantic_segmentation', cc.Raw, 'Camera Semantic Segmentation (Raw)'],
-            ['sensor.camera.semantic_segmentation', cc.CityScapesPalette,
-                'Camera Semantic Segmentation (CityScapes Palette)'],
-            ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)']]
-        world = self._parent.get_world()
-        bp_library = world.get_blueprint_library()
-        for item in self.sensors:
-            bp = bp_library.find(item[0])
-            if item[0].startswith('sensor.camera'):
-
-                # set field of view angle and surface resolution
-                bp.set_attribute('fov', str(70))
-                bp.set_attribute('image_size_x', str(self.resolution[0]))
-                bp.set_attribute('image_size_y', str(self.resolution[1]))
-            elif item[0].startswith('sensor.lidar'):
-                bp.set_attribute('range', '50')
-            item.append(bp)
-        self.index = None
-
-    def toggle_camera(self):
-        self.transform_index = (self.transform_index + 1) % len(self._camera_transforms)
-        self.sensor.set_transform(self._camera_transforms[self.transform_index])
-
-    def set_sensor(self, index, notify=True):
-        index = index % len(self.sensors)
-        needs_respawn = True if self.index is None \
-            else self.sensors[index][0] != self.sensors[self.index][0]
-        if needs_respawn:
-            if self.sensor is not None:
-                self.sensor.destroy()
-                self.surface = None
-            self.sensor = self._parent.get_world().spawn_actor(
-                self.sensors[index][-1],
-                self._camera_transforms[self.transform_index],
-                attach_to=self._parent)
-            # We need to pass the lambda a weak reference to self to avoid
-            # circular reference.
-            weak_self = weakref.ref(self)
-            self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
-        if notify:
-            self.hud.notification(self.sensors[index][2])
-        self.index = index
-
-    def next_sensor(self):
-        self.set_sensor(self.index + 1)
-
-    def toggle_recording(self):
-        self.recording = not self.recording
-        self.hud.notification('Recording %s' % ('On' if self.recording else 'Off'))
-
-    def render(self, display):
-        if self.surface is not None:
-            display.blit(pygame.transform.scale(self.surface, self.displaysize), (0, 0))
-
-    @staticmethod
-    def _parse_image(weak_self, image):
-        self = weak_self()
-        if not self:
-            return
-        if self.sensors[self.index][0].startswith('sensor.lidar'):
-            points = np.frombuffer(image.raw_data, dtype=np.dtype('f4'))
-            points = np.reshape(points, (int(points.shape[0] / 3), 3))
-            lidar_data = np.array(points[:, :2])
-            lidar_data *= min(self.hud.dim) / 100.0
-            lidar_data += (0.5 * self.hud.dim[0], 0.5 * self.hud.dim[1])
-            lidar_data = np.fabs(lidar_data) # pylint: disable=E1111
-            lidar_data = lidar_data.astype(np.int32)
-            lidar_data = np.reshape(lidar_data, (-1, 2))
-            lidar_img_size = (self.hud.dim[0], self.hud.dim[1], 3)
-            lidar_img = np.zeros(lidar_img_size)
-            lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
-            self.surface = pygame.surfarray.make_surface(lidar_img)
-        else:
-            image.convert(self.sensors[self.index][1])
-            array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-            array = np.reshape(array, (image.height, image.width, 4))
-            array = array[:, :, :3]
-            array = array[:, :, ::-1]
-            self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        if self.recording:
-            image.save_to_disk('_out/%08d' % image.frame)
-
-
-# ==============================================================================
 # -- game_loop() ---------------------------------------------------------------
 # ==============================================================================
 # The game loop now will instantiate an Arduino object that stores the connection
@@ -853,30 +743,28 @@ def game_loop(args):
     pygame.font.init()
     world = None
     simulator = None
-
-    refreshrate = int(args.refresh)
-
-    # displaysize will be screen size
-    displaysize = (args.dis_width, args.dis_height)
+    refresh_rate = int(args.refresh_rate)
+    display_size = args.display_size
 
     try:
+        logging.info('listening to server %s:%s', args.host, args.port)
         client = carla.Client(args.host, args.port)
         client.set_timeout(2.0)
 
         simulator = Arduino()
 
-        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (3840, 0)
+        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % tuple(args.window_pos)
         display = pygame.display.set_mode(
-            displaysize,
+            display_size,
             pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.NOFRAME)
 
-        hud = HUD(displaysize[0], displaysize[1])
+        hud = HUD(display_size[0], display_size[1])
         world = World(client.get_world(), hud, args)
         controller = DualControl(world, args.autopilot)
 
         clock = pygame.time.Clock()
         while True:
-            clock.tick_busy_loop(refreshrate)
+            clock.tick_busy_loop(refresh_rate)
             if controller.parse_events(world, clock, simulator):
                 return
             world.tick(clock)
@@ -954,24 +842,32 @@ def main():
         help='refresh rate of clients')
     args = argparser.parse_args()
 
-    args.res_width, args.res_height = [int(x) for x in args.res.split('x')]
-    args.dis_width, args.dis_height = [int(x) for x in args.dis.split('x')]
+    if args.config is not None:
+        # read config file
+        with open(args.config) as f:
+            cfg = yaml.load(f, Loader=yaml.Loader)
+        cfg_default_params = cfg.get("default", {})
+        cfg_display_params = cfg.get(args.display_name, {})
+        cfg_params = {**cfg_default_params, **cfg_display_params}
+        # set parameters
+        args.resolution = cfg_params.pop("resolution", args.resolution)
+        args.display_size = cfg_params.pop("display_size", args.display_size)
+        for param in cfg_params:
+            setattr(args, param, cfg_params[param])
+
+    args.resolution = tuple([int(x) for x in args.resolution.split('x')])
+    args.display_size = tuple([int(x) for x in args.display_size.split('x')])
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
 
-    logging.info('listening to server %s:%s', args.host, args.port)
-
     print(__doc__)
 
     try:
-
         game_loop(args)
-
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
 
 
 if __name__ == '__main__':
-
     main()
