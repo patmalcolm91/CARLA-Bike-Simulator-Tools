@@ -62,6 +62,7 @@ import re
 import weakref
 
 from .CameraManager import CameraManager
+from .BikeSensor import BikeSensor
 
 if sys.version_info >= (3, 0):
 
@@ -125,31 +126,6 @@ def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
-
-# ==============================================================================
-# -- Arduino -------------------------------------------------------------------
-# ==============================================================================
-# Implementation of the Arduino. The code to connect with the Arduino was
-# provided by Patrick Malcolm, one of the thesis supervisors, and adapted to be
-# appropiately used in this module.
-
-class Arduino(object):
-    def __init__(self):
-        self.address = ('192.168.178.133', 5000)  # Define who you are talking to (must match arduino IP and port)
-        self.client_socket = socket(AF_INET, SOCK_DGRAM)  # Set Up the Socket
-        self.client_socket.setblocking(0)
-        self.client_socket.settimeout(1)  # only wait 1 second for a resonse
-        self.client_socket.sendto("foo".encode("utf-8"), self.address)  # send command to arduino
-
-    def throttle_steering(self):
-        try:
-            self.client_socket.sendto("foo".encode("utf-8"), self.address)  # send command to arduino
-            rec_data, addr = self.client_socket.recvfrom(64)  # buffer size is 1024 bytes
-        except Exception as err:
-            raise err
-        else:
-            #        print "Failed to receive data from Arduino."
-            return rec_data.decode().split("|")
 
 # ==============================================================================
 # -- World ---------------------------------------------------------------------
@@ -308,7 +284,7 @@ class DualControl(object):
         self._steer_cache = 0.0
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
-    def parse_events(self, world, clock, arduino):
+    def parse_events(self, world, clock, bike_sensor):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
@@ -367,7 +343,7 @@ class DualControl(object):
         if not self._autopilot_enabled:
             if isinstance(self._control, carla.VehicleControl):
                 self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
-                self._parse_vehicle_wheel(arduino)
+                self._parse_vehicle_wheel(bike_sensor)
                 self._control.reverse = self._control.gear < 0
             elif isinstance(self._control, carla.WalkerControl):
                 self._parse_walker_keys(pygame.key.get_pressed(), clock.get_time())
@@ -387,22 +363,22 @@ class DualControl(object):
         self._control.brake = 1.0 if keys[K_DOWN] or keys[K_s] else 0.0
         self._control.hand_brake = keys[K_SPACE]
 
-    def _parse_vehicle_wheel(self, arduino):
+    def _parse_vehicle_wheel(self, bike_sensor):
 
         # request sensor outputs from Arduino
-        simulator_control = arduino.throttle_steering()
+        speed, steering = bike_sensor.get_speed_and_steering()
 
         # scale and apply steering
-        self._control.steer = float(simulator_control[1])/self.steering_scale
+        self._control.steer = steering/self.steering_scale
 
         # check if speed value has changed
         #   check if speed decrease exceeds brake_threshold else set brake to 0
         #       set brake to how much brake_thrshold is exceeded
         # cosmetic: if throttle is 0 set brake to 0
         # store reference brake value
-        if self.throttle != float(simulator_control[0])/self.throttle_scale:
-            if self.throttle - float(simulator_control[0])/self.throttle_scale > self.brake_threshold:
-                self.brake = self.throttle - (float(simulator_control[0])/self.throttle_scale + self.brake_threshold)
+        if self.throttle != speed/self.throttle_scale:
+            if self.throttle - speed/self.throttle_scale > self.brake_threshold:
+                self.brake = self.throttle - (speed/self.throttle_scale + self.brake_threshold)
             else:
                 self.brake = 0
         elif self.throttle == 0:
@@ -411,11 +387,11 @@ class DualControl(object):
 
         # scale simulator speed output and limit to maximum 1
         # store reference throttle value
-        if float(simulator_control[0])/self.throttle_scale >= 1:
+        if speed/self.throttle_scale >= 1:
             self._control.throttle = 1
         else:
-            self._control.throttle = float(simulator_control[0])/self.throttle_scale
-        self.throttle = float(simulator_control[0])/self.throttle_scale
+            self._control.throttle = speed/self.throttle_scale
+        self.throttle = speed/self.throttle_scale
 
     def _parse_walker_keys(self, keys, milliseconds):
         self._control.speed = 0.0
@@ -742,7 +718,6 @@ def game_loop(args):
     pygame.init()
     pygame.font.init()
     world = None
-    simulator = None
     refresh_rate = int(args.refresh_rate)
     display_size = args.display_size
 
@@ -751,7 +726,7 @@ def game_loop(args):
         client = carla.Client(args.host, args.port)
         client.set_timeout(2.0)
 
-        simulator = Arduino()
+        bike_sensor = BikeSensor()
 
         os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % tuple(args.window_pos)
         display = pygame.display.set_mode(
@@ -765,7 +740,7 @@ def game_loop(args):
         clock = pygame.time.Clock()
         while True:
             clock.tick_busy_loop(refresh_rate)
-            if controller.parse_events(world, clock, simulator):
+            if controller.parse_events(world, clock, bike_sensor):
                 return
             world.tick(clock)
             world.render(display)
