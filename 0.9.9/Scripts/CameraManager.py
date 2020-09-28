@@ -27,7 +27,6 @@ except IndexError:
 # ==============================================================================
 # -- imports -------------------------------------------------------------------
 # ==============================================================================
-# all unneeded imports were removed
 
 import carla
 
@@ -121,8 +120,7 @@ class CameraManager(object):
                 self._camera_transforms[self.transform_index][0],
                 attach_to=self._parent,
                 attachment_type=self._camera_transforms[self.transform_index][1])
-            # We need to pass the lambda a weak reference to self to avoid
-            # circular reference.
+            # We need to pass the lambda a weak reference to self to avoid circular reference.
             weak_self = weakref.ref(self)
             self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
         self.index = index

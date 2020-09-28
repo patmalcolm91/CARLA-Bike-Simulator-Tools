@@ -44,8 +44,8 @@ except IndexError:
 # ==============================================================================
 
 # additional imports
-from socket import * # used for Arduino connection
-import os # used to define the display position
+from socket import *  # used for Arduino connection
+import os  # used to define the display position
 
 import carla
 
@@ -130,7 +130,7 @@ def get_actor_display_name(actor, truncate=250):
 # ==============================================================================
 # -- World ---------------------------------------------------------------------
 # ==============================================================================
-# World will now make display size and surface resolution accesible by including
+# World will now make display size and surface resolution accessible by including
 # them in the class instantiation. restart() has been updated to take additional
 # boolean inputs 'bike' and 'engine'. If set to True restart() will load a bicycle
 # Blueprint or apply the new engine setup, respectively. The new engine setup
@@ -140,9 +140,9 @@ def get_actor_display_name(actor, truncate=250):
 class World(object):
     def __init__(self, carla_world, hud, args):
         self.world = carla_world
-        self.display_size = (args.dis_width, args.dis_height) # set up correct disply size for CameraManager
-        self.resolution = (args.res_width, args.res_height) # set up the correct resolution for CameraManager
-        self.actor_role_name = args.rolename # allow to use a custom player name
+        self.display_size = (args.dis_width, args.dis_height)  # set up correct display size for CameraManager
+        self.resolution = (args.res_width, args.res_height)  # set up the correct resolution for CameraManager
+        self.actor_role_name = args.rolename  # allow to use a custom player name
 
         # following section was copied from manual_control.py
         try:
@@ -162,7 +162,7 @@ class World(object):
         self._weather_presets = find_weather_presets()
         self._weather_index = 0
         self._actor_filter = args.filter
-        self.restart(bike=True, engine=True) # On World instantiation use bicycle and new engine setup
+        self.restart(bike=True, engine=True)  # On World instantiation use bicycle and new engine setup
         self.world.on_tick(hud.on_world_tick)
         self.camera_params = {k: args[k] for k in CameraManager.DEFAULT_PARAMS}
 
@@ -266,11 +266,11 @@ class World(object):
 
 class DualControl(object):
     def __init__(self, world, start_in_autopilot):
-        self.brake_threshold = 0.0025 # new brake_threshold variable
-        self.steering_scale = 90 # set value by which steering shall be scaled
-        self.throttle_scale = 1600 # set value by how much speed shall be scaled
-        self.throttle = 0 # new variable to store reference throttle
-        self.brake = 0 # new variable to store reference brake
+        self.brake_threshold = 0.0025  # new brake_threshold variable
+        self.steering_scale = 90  # set value by which steering shall be scaled
+        self.throttle_scale = 1600  # set value by how much speed shall be scaled
+        self.throttle = 0  # new variable to store reference throttle
+        self.brake = 0  # new variable to store reference brake
         self._autopilot_enabled = start_in_autopilot
         if isinstance(world.player, carla.Vehicle):
             self._control = carla.VehicleControl()
@@ -319,7 +319,7 @@ class DualControl(object):
                     world.next_weather()
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
-                elif event.key > K_0 and event.key <= K_9:
+                elif K_0 < event.key <= K_9:
                     world.camera_manager.set_sensor(event.key - 1 - K_0)
                 elif event.key == K_r:
                     world.camera_manager.toggle_recording()
@@ -365,7 +365,7 @@ class DualControl(object):
 
     def _parse_vehicle_wheel(self, bike_sensor):
 
-        # request sensor outputs from Arduino
+        # request sensor outputs from arduino
         speed, steering = bike_sensor.get_speed_and_steering()
 
         # scale and apply steering
@@ -373,7 +373,7 @@ class DualControl(object):
 
         # check if speed value has changed
         #   check if speed decrease exceeds brake_threshold else set brake to 0
-        #       set brake to how much brake_thrshold is exceeded
+        #       set brake to how much brake_threshold is exceeded
         # cosmetic: if throttle is 0 set brake to 0
         # store reference brake value
         if self.throttle != speed/self.throttle_scale:
@@ -437,7 +437,7 @@ class HUD(object):
         self.server_fps = 0
         self.frame = 0
         self.simulation_time = 0
-        self._show_info = True # change this to False if the simulator shall launch without HUD
+        self._show_info = True  # change this to False if the simulator shall launch without HUD
         self._info_text = []
         self._server_clock = pygame.time.Clock()
 
@@ -468,7 +468,7 @@ class HUD(object):
             'Client:  % 16.0f FPS' % clock.get_fps(),
             '',
             'Vehicle: % 20s' % get_actor_display_name(world.player, truncate=20),
-            #'Map:     % 20s' % world.world.map_name,
+            # 'Map:     % 20s' % world.world.map_name,
             'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
             '',
             'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)),
@@ -691,8 +691,7 @@ class GnssSensor(object):
         world = self._parent.get_world()
         bp = world.get_blueprint_library().find('sensor.other.gnss')
         self.sensor = world.spawn_actor(bp, carla.Transform(carla.Location(x=1.0, z=2.8)), attach_to=self._parent)
-        # We need to pass the lambda a weak reference to self to avoid circular
-        # reference.
+        # We need to pass the lambda a weak reference to self to avoid circular reference.
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: GnssSensor._on_gnss_event(weak_self, event))
 
@@ -708,8 +707,8 @@ class GnssSensor(object):
 # ==============================================================================
 # -- game_loop() ---------------------------------------------------------------
 # ==============================================================================
-# The game loop now will instantiate an Arduino object that stores the connection
-# to the Arduino. A line of code was added before launching the display to set
+# The game loop now will instantiate an arduino object that stores the connection
+# to the arduino. A line of code was added before launching the display to set
 # its position. The display got an additional NOFRAME flag. The update rate of
 # the client has been reduced from 60 to 20.
 
@@ -757,7 +756,7 @@ def game_loop(args):
 # ==============================================================================
 # -- main() --------------------------------------------------------------------
 # ==============================================================================
-# Three additional arguments have been added: display size, rolename and gamme.
+# Three additional arguments have been added: display size, rolename and gamma.
 # Rolename and gamma have been directly adapted from manual_control.py. Display
 # size is based on the existing resolution argument, which use has been slightly
 # repurposed to reflect the decoupling of display size and surface resolution.
