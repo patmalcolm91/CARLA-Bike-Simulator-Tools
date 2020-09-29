@@ -77,10 +77,10 @@ def plot_fov(configs, ax=None, show_position=False):
         a1 *= math.pi / 180
         a2 *= math.pi / 180
         r = 1
-        l0 = Line2D([theta0, theta0+c], [r0, r0+r], color=COLORS[i], dashes=(5, 2, 2, 2))
+        l0 = Line2D([theta0, theta0+c], [r0, r0+r*math.cos(fov/2*math.pi/180)], color=COLORS[i], dashes=(5, 2, 2, 2))
         l1 = Line2D([theta0, theta0+a1], [r0, r0+r], color="black")
         l2 = Line2D([theta0, theta0+a2], [r0, r0+r], color="black")
-        l3 = Line2D([theta0+a1, theta0+a2], [r0+r, r0+r], color="black")
+        l3 = Line2D([theta0+a1, theta0+a2], [r0+r, r0+r], color=COLORS[i])
         ax.add_artist(l1)
         ax.add_artist(l2)
         ax.add_artist(l0)
