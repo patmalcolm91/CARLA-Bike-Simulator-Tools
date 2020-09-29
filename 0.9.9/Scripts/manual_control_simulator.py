@@ -140,8 +140,8 @@ def get_actor_display_name(actor, truncate=250):
 class World(object):
     def __init__(self, carla_world, hud, args):
         self.world = carla_world
-        self.display_size = (args.dis_width, args.dis_height)  # set up correct display size for CameraManager
-        self.resolution = (args.res_width, args.res_height)  # set up the correct resolution for CameraManager
+        self.display_size = args.display_size  # set up correct display size for CameraManager
+        self.resolution = args.resolution  # set up the correct resolution for CameraManager
         self.actor_role_name = args.rolename  # allow to use a custom player name
 
         # following section was copied from manual_control.py
@@ -162,9 +162,9 @@ class World(object):
         self._weather_presets = find_weather_presets()
         self._weather_index = 0
         self._actor_filter = args.filter
+        self.camera_params = {k: getattr(args, k) for k in CameraManager.DEFAULT_PARAMS}
         self.restart(bike=True, engine=True)  # On World instantiation use bicycle and new engine setup
         self.world.on_tick(hud.on_world_tick)
-        self.camera_params = {k: args[k] for k in CameraManager.DEFAULT_PARAMS}
 
     def restart(self, bike=False, engine=False):
         # Keep same camera config if the camera manager exists.
@@ -199,7 +199,7 @@ class World(object):
         self.gnss_sensor = GnssSensor(self.player)
         self.camera_manager = CameraManager(self.player, **self.camera_params)
         self.camera_manager.transform_index = cam_pos_index
-        self.camera_manager.set_sensor(cam_index, notify=False)
+        self.camera_manager.set_sensor(cam_index)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
 
@@ -734,7 +734,7 @@ def game_loop(args):
 
         hud = HUD(display_size[0], display_size[1])
         world = World(client.get_world(), hud, args)
-        controller = DualControl(world, args.autopilot)
+        controller = DualControl(world, start_in_autopilot=False)
 
         clock = pygame.time.Clock()
         while True:
@@ -781,16 +781,12 @@ def main():
         type=int,
         help='TCP port to listen to (default: 2000)')
     argparser.add_argument(
-        '-a', '--autopilot',
-        action='store_true',
-        help='enable autopilot')
-    argparser.add_argument(
-        '--res',
+        '--resolution',
         metavar='WIDTHxHEIGHT',
         default='1280x720',
         help='window resolution (default: 1280x720)')
     argparser.add_argument(
-        '--dis',
+        '--display_size',
         metavar='WIDTHxHEIGHT',
         default='1920x1080',
         help='display size (default: 1920x1080)')
@@ -810,10 +806,18 @@ def main():
         type=float,
         help='Gamma correction of the camera (default: 2.2)')
     argparser.add_argument(
-        '--refresh',
-        metavar='refreshrate',
+        '--refresh_rate',
+        metavar='refresh_rate',
         default=20,
         help='refresh rate of clients')
+    argparser.add_argument(
+        '--config',
+        type=str,
+        help='Path to YAML config file containing display settings.')
+    argparser.add_argument(
+        '--display_name',
+        metavar='display_name',
+        help='Name of display. Used to get parameters from config file.')
     args = argparser.parse_args()
 
     if args.config is not None:

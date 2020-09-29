@@ -55,6 +55,7 @@ except ImportError:
 class CameraManager(object):
 
     DEFAULT_PARAMS = {
+        "display_size": (1920, 1080),
         "resolution": (1920, 1080),
         "camera_x": 0,
         "camera_y": 0,
