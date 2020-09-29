@@ -16,11 +16,11 @@ center:
 left:
   resolution: 960x540
   window_pos: [1920, 0]
-  camera_yaw: -70
+  camera_yaw: 70
 right:
   resolution: 960x540
   window_pos: [5760, 0]
-  camera_yaw: 70
+  camera_yaw: -70
 left_rear:
   resolution: 800x450
   window_pos: [0, 0]
