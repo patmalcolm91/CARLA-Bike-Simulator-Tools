@@ -727,7 +727,8 @@ def game_loop(args):
 
         bike_sensor = BikeSensor()
 
-        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % tuple(args.window_pos)
+        if hasattr(args, "window_pos"):
+            os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % tuple(args.window_pos)
         display = pygame.display.set_mode(
             display_size,
             pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.NOFRAME)
