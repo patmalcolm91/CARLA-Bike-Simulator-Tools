@@ -68,7 +68,7 @@ class World(object):
                 self.player = actor
                 break
         self.camera_manager = None
-        self.camera_params = {k: args[k] for k in CameraManager.DEFAULT_PARAMS}
+        self.camera_params = {k: getattr(args, k, CameraManager.DEFAULT_PARAMS[k]) for k in CameraManager.DEFAULT_PARAMS}
         self.restart()
 
     def restart(self):
