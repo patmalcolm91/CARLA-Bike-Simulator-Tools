@@ -60,6 +60,7 @@ def plot_fov(configs, ax=None, show_position=False):
     """
     if ax is None:
         ax = plt.subplot(projection="polar")
+    ax.set_theta_direction(-1)
     names = sorted(list(configs.keys()))
     landmarks = []
     for name, cfg in configs.items():
@@ -87,12 +88,12 @@ def plot_fov(configs, ax=None, show_position=False):
         ax.add_artist(l3)
         label_angle = (c*180/math.pi+270)%180-90
         label = name + "\n(" + str(fov) + "°)"
-        plt.annotate(label, (0.5, 0.5), xycoords=l0, ha="center", va="center", rotation=label_angle,
+        plt.annotate(label, (0.5, 0.5), xycoords=l0, ha="center", va="center", rotation=-label_angle,
                      backgroundcolor="white", color=COLORS[i])
     landmarks = list(set(landmarks))
     for theta in landmarks:
         label_angle = (theta + 270) % 180 - 90
-        plt.annotate(str(theta)+"°", (theta*math.pi/180, r*0.8), ha="center", va="center", rotation=label_angle,
+        plt.annotate(str(theta)+"°", (theta*math.pi/180, r*0.8), ha="center", va="center", rotation=-label_angle,
                      color="black", bbox=dict(boxstyle='square', fc='white', ec='none', pad=0.2))
     ax.set_yticks([])
 
