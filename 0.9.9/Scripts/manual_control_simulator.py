@@ -61,8 +61,8 @@ import random
 import re
 import weakref
 
-from .CameraManager import CameraManager
-from .BikeSensor import BikeSensor
+from CameraManager import CameraManager
+from BikeSensor import BikeSensor
 
 if sys.version_info >= (3, 0):
 

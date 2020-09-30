@@ -33,7 +33,7 @@ import yaml
 import argparse
 import logging
 
-from .CameraManager import CameraManager
+from CameraManager import CameraManager
 
 try:
     import pygame
