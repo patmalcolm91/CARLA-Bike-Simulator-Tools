@@ -54,8 +54,6 @@ def run_manager(host, port):
                                       command=lambda: vehicles_dict[tkego.get()].set_velocity(carla.Vector3D(0, 0, 0))
                                       ).grid(row=3, column=1)
 
-
-
     # Start GUI main loop
     root.mainloop()
 
