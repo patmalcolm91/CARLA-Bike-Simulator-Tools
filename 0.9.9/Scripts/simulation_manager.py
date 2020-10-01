@@ -15,12 +15,19 @@ def find_weather_presets():
     return {name(x): getattr(carla.WeatherParameters, x) for x in presets}
 
 
+def get_actor_display_name(actor, truncate=250):
+    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
+    return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
+
+
 def run_manager(host, port):
     # Initialize carla client and get necessary information
     client = carla.Client(host, port)
     client.set_timeout(2.0)
     world = client.get_world()  # type: carla.World
     weather_presets = find_weather_presets()  # returns dict {name: weather_params}
+    vehicles = world.get_actors().filter('vehicle.*')  # type: list[carla.Actor]
+    vehicles_dict = {veh.attributes["role_name"]: veh for veh in vehicles}
 
     # Create GUI
     root = tk.Tk()
@@ -34,6 +41,20 @@ def run_manager(host, port):
     tk.OptionMenu(main_frame, tkweather, *weather_presets.keys()).grid(row=1, column=2)
     tk.Label(main_frame, text="Weather Presets").grid(row=1, column=1)
     tkweather.trace("w", lambda *args: world.set_weather(weather_presets[tkweather.get()]))
+    # ego information and control
+    tkego = tk.StringVar(root)
+    if "hero" in vehicles_dict:
+        tkego.set("hero")
+    elif "ego" in vehicles_dict:
+        tkego.set("ego")
+    tk.Label(main_frame, text="Ego Vehicle").grid(row=2, column=1)
+    vehicles_dropdown = tk.OptionMenu(main_frame, tkego, *vehicles_dict.keys() if len(vehicles_dict) else [""])
+    vehicles_dropdown.grid(row=2, column=2)
+    emergency_stop_button = tk.Button(main_frame, text="Stop Ego",
+                                      command=lambda: vehicles_dict[tkego.get()].set_velocity(carla.Vector3D(0, 0, 0))
+                                      ).grid(row=3, column=1)
+
+
 
     # Start GUI main loop
     root.mainloop()
