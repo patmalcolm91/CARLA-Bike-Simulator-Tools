@@ -114,14 +114,6 @@ except ImportError:
 # -- Global functions ----------------------------------------------------------
 # ==============================================================================
 
-
-def find_weather_presets():
-    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
-    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
-    return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
-
-
 def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
@@ -159,8 +151,6 @@ class World(object):
         self.lane_invasion_sensor = None
         self.gnss_sensor = None
         self.camera_manager = None
-        self._weather_presets = find_weather_presets()
-        self._weather_index = 0
         self._actor_filter = args.filter
         self.camera_params = {k: getattr(args, k) for k in CameraManager.DEFAULT_PARAMS}
         self.restart(bike=True, engine=True)  # On World instantiation use bicycle and new engine setup
@@ -227,13 +217,6 @@ class World(object):
             # ]
             self.player.apply_physics_control(physics)
 
-    def next_weather(self, reverse=False):
-        self._weather_index += -1 if reverse else 1
-        self._weather_index %= len(self._weather_presets)
-        preset = self._weather_presets[self._weather_index]
-        self.hud.notification('Weather: %s' % preset[1])
-        self.player.get_world().set_weather(preset[0])
-
     def tick(self, clock):
         self.hud.tick(self, clock)
 
@@ -295,8 +278,6 @@ class DualControl(object):
                     world.hud.toggle_info()
                 elif event.button == 2:
                     world.camera_manager.toggle_camera()
-                elif event.button == 3:
-                    world.next_weather()
                 elif event.button == self._reverse_idx:
                     self._control.gear = 1 if self._control.reverse else -1
                 elif event.button == 23:
@@ -313,10 +294,6 @@ class DualControl(object):
                     world.hud.help.toggle()
                 elif event.key == K_TAB:
                     world.camera_manager.toggle_camera()
-                elif event.key == K_c and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_weather(reverse=True)
-                elif event.key == K_c:
-                    world.next_weather()
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif K_0 < event.key <= K_9:
