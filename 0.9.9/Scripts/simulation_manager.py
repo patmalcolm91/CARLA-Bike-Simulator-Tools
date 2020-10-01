@@ -1,0 +1,47 @@
+"""
+A tool for managing various simulation parameters.
+"""
+
+import carla
+import argparse
+import re
+import tkinter as tk
+
+
+def find_weather_presets():
+    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
+    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
+    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
+    return {name(x): getattr(carla.WeatherParameters, x) for x in presets}
+
+
+def run_manager(host, port):
+    # Initialize carla client and get necessary information
+    client = carla.Client(host, port)
+    client.set_timeout(2.0)
+    world = client.get_world()  # type: carla.World
+    weather_presets = find_weather_presets()  # returns dict {name: weather_params}
+
+    # Create GUI
+    root = tk.Tk()
+    root.title("Carla Simulation Manager")
+    main_frame = tk.Frame(root)
+    main_frame.grid(column=0, row=0, sticky=(tk.N, tk.W, tk.E, tk.S))
+    main_frame.pack(padx=10, pady=10)
+    # weather preset widget
+    tkweather = tk.StringVar(root)
+    tkweather.set("Default" if "Default" in weather_presets else next(iter(weather_presets)))
+    tk.OptionMenu(main_frame, tkweather, *weather_presets.keys()).grid(row=1, column=2)
+    tk.Label(main_frame, text="Weather Presets").grid(row=1, column=1)
+    tkweather.trace("w", lambda *args: world.set_weather(weather_presets[tkweather.get()]))
+
+    # Start GUI main loop
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Carla Simulation Manager")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="IP of the host server (default: 127.0.0.1)")
+    parser.add_argument("-p", "--port", type=int, default=2000, help="TCP port to listen to (default: 2000)")
+    args = parser.parse_args()
+    run_manager(args.host, args.port)
