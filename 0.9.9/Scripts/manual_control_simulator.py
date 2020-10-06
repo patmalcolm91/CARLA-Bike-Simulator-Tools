@@ -9,13 +9,7 @@
 # documented example, please take a look at tutorial.py.
 
 """
-Welcome to CARLA manual control with steering wheel Logitech G29.
-
-To drive start by preshing the brake pedal.
-Change your wheel_config.ini according to your steering wheel.
-
-To find out the values of your steering wheel use jstest-gtk in Ubuntu.
-
+Bike Simulator Main Client
 """
 
 from __future__ import print_function
@@ -148,29 +142,18 @@ class World(object):
         self.hud = hud
         self.player = None
         self.collision_sensor = None
-        self.lane_invasion_sensor = None
-        self.gnss_sensor = None
         self.camera_manager = None
         self._actor_filter = args.filter
         self.camera_params = {k: getattr(args, k) for k in CameraManager.DEFAULT_PARAMS}
-        self.restart(bike=True, engine=True)  # On World instantiation use bicycle and new engine setup
+        self.restart(engine=True)  # On World instantiation use bicycle and new engine setup
         self.world.on_tick(hud.on_world_tick)
 
-    def restart(self, bike=False, engine=False):
+    def restart(self, engine=False):
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
 
-        # if bike is TRUE load a bicycle. This blueprint can/shall be replaced by the simulator vehicle
-        if bike:
-            blueprint = self.world.get_blueprint_library().find('vehicle.diamondback.century')
-        else:
-            # Get a random blueprint.
-            blueprint = random.choice(self.world.get_blueprint_library().filter(self._actor_filter))
-        blueprint.set_attribute('role_name', self.actor_role_name)
-        if blueprint.has_attribute('color'):
-            color = random.choice(blueprint.get_attribute('color').recommended_values)
-            blueprint.set_attribute('color', color)
+        blueprint = self.world.get_blueprint_library().find('vehicle.diamondback.century')
         # Spawn the player.
         if self.player is not None:
             spawn_point = self.player.get_transform()
@@ -185,8 +168,6 @@ class World(object):
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
-        self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
-        self.gnss_sensor = GnssSensor(self.player)
         self.camera_manager = CameraManager(self.player, **self.camera_params)
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index)
@@ -228,8 +209,6 @@ class World(object):
         actors = [
             self.camera_manager.sensor,
             self.collision_sensor.sensor,
-            self.lane_invasion_sensor.sensor,
-            self.gnss_sensor.sensor,
             self.player]
         for actor in actors:
             if actor is not None:
@@ -248,20 +227,14 @@ class World(object):
 
 
 class DualControl(object):
-    def __init__(self, world, start_in_autopilot):
+    def __init__(self, world):
         self.brake_threshold = 0.0025  # new brake_threshold variable
         self.steering_scale = 90  # set value by which steering shall be scaled
         self.throttle_scale = 1600  # set value by how much speed shall be scaled
         self.throttle = 0  # new variable to store reference throttle
         self.brake = 0  # new variable to store reference brake
-        self._autopilot_enabled = start_in_autopilot
         if isinstance(world.player, carla.Vehicle):
             self._control = carla.VehicleControl()
-            world.player.set_autopilot(self._autopilot_enabled)
-        elif isinstance(world.player, carla.Walker):
-            self._control = carla.WalkerControl()
-            self._autopilot_enabled = False
-            self._rotation = world.player.get_transform().rotation
         else:
             raise NotImplementedError("Actor type not supported")
         self._steer_cache = 0.0
@@ -271,18 +244,6 @@ class DualControl(object):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
-            elif event.type == pygame.JOYBUTTONDOWN:
-                if event.button == 0:
-                    world.restart()
-                elif event.button == 1:
-                    world.hud.toggle_info()
-                elif event.button == 2:
-                    world.camera_manager.toggle_camera()
-                elif event.button == self._reverse_idx:
-                    self._control.gear = 1 if self._control.reverse else -1
-                elif event.button == 23:
-                    world.camera_manager.next_sensor()
-
             elif event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
@@ -292,41 +253,28 @@ class DualControl(object):
                     world.hud.toggle_info()
                 elif event.key == K_h or (event.key == K_SLASH and pygame.key.get_mods() & KMOD_SHIFT):
                     world.hud.help.toggle()
-                elif event.key == K_TAB:
-                    world.camera_manager.toggle_camera()
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif K_0 < event.key <= K_9:
                     world.camera_manager.set_sensor(event.key - 1 - K_0)
-                elif event.key == K_r:
-                    world.camera_manager.toggle_recording()
-                if isinstance(self._control, carla.VehicleControl):
-                    if event.key == K_q:
-                        self._control.gear = 1 if self._control.reverse else -1
-                    elif event.key == K_m:
-                        self._control.manual_gear_shift = not self._control.manual_gear_shift
-                        self._control.gear = world.player.get_control().gear
-                        world.hud.notification('%s Transmission' %
-                                               ('Manual' if self._control.manual_gear_shift else 'Automatic'))
-                    elif self._control.manual_gear_shift and event.key == K_COMMA:
-                        self._control.gear = max(-1, self._control.gear - 1)
-                    elif self._control.manual_gear_shift and event.key == K_PERIOD:
-                        self._control.gear = self._control.gear + 1
-                    elif event.key == K_p:
-                        self._autopilot_enabled = not self._autopilot_enabled
-                        world.player.set_autopilot(self._autopilot_enabled)
-                        world.hud.notification('Autopilot %s' % ('On' if self._autopilot_enabled else 'Off'))
+                elif event.key == K_q:
+                    self._control.gear = 1 if self._control.reverse else -1
+                elif event.key == K_m:
+                    self._control.manual_gear_shift = not self._control.manual_gear_shift
+                    self._control.gear = world.player.get_control().gear
+                    world.hud.notification('%s Transmission' %
+                                           ('Manual' if self._control.manual_gear_shift else 'Automatic'))
+                elif self._control.manual_gear_shift and event.key == K_COMMA:
+                    self._control.gear = max(-1, self._control.gear - 1)
+                elif self._control.manual_gear_shift and event.key == K_PERIOD:
+                    self._control.gear = self._control.gear + 1
 
-        if not self._autopilot_enabled:
-            if isinstance(self._control, carla.VehicleControl):
-                self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
-                self._parse_vehicle_wheel(bike_sensor)
+                self._parse_vehicle_keyboard_input(pygame.key.get_pressed(), clock.get_time())
+                self._parse_vehicle_controller_input(bike_sensor)
                 self._control.reverse = self._control.gear < 0
-            elif isinstance(self._control, carla.WalkerControl):
-                self._parse_walker_keys(pygame.key.get_pressed(), clock.get_time())
-            world.player.apply_control(self._control)
+                world.player.apply_control(self._control)
 
-    def _parse_vehicle_keys(self, keys, milliseconds):
+    def _parse_vehicle_keyboard_input(self, keys, milliseconds):
         self._control.throttle = 1.0 if keys[K_UP] or keys[K_w] else 0.0
         steer_increment = 5e-4 * milliseconds
         if keys[K_LEFT] or keys[K_a]:
@@ -340,7 +288,7 @@ class DualControl(object):
         self._control.brake = 1.0 if keys[K_DOWN] or keys[K_s] else 0.0
         self._control.hand_brake = keys[K_SPACE]
 
-    def _parse_vehicle_wheel(self, bike_sensor):
+    def _parse_vehicle_controller_input(self, bike_sensor):
 
         # request sensor outputs from arduino
         speed, steering = bike_sensor.get_speed_and_steering()
@@ -369,22 +317,6 @@ class DualControl(object):
         else:
             self._control.throttle = speed/self.throttle_scale
         self.throttle = speed/self.throttle_scale
-
-    def _parse_walker_keys(self, keys, milliseconds):
-        self._control.speed = 0.0
-        if keys[K_DOWN] or keys[K_s]:
-            self._control.speed = 0.0
-        if keys[K_LEFT] or keys[K_a]:
-            self._control.speed = .01
-            self._rotation.yaw -= 0.08 * milliseconds
-        if keys[K_RIGHT] or keys[K_d]:
-            self._control.speed = .01
-            self._rotation.yaw += 0.08 * milliseconds
-        if keys[K_UP] or keys[K_w]:
-            self._control.speed = 5.556 if pygame.key.get_mods() & KMOD_SHIFT else 2.778
-        self._control.jump = keys[K_SPACE]
-        self._rotation.yaw = round(self._rotation.yaw, 1)
-        self._control.direction = self._rotation.get_forward_vector()
 
     @staticmethod
     def _is_quit_shortcut(key):
@@ -451,7 +383,6 @@ class HUD(object):
             'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)),
             u'Heading:% 16.0f\N{DEGREE SIGN} % 2s' % (t.rotation.yaw, heading),
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (t.location.x, t.location.y)),
-            'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
             'Height:  % 18.0f m' % t.location.z,
             '']
         if isinstance(c, carla.VehicleControl):
@@ -628,60 +559,6 @@ class CollisionSensor(object):
 
 
 # ==============================================================================
-# -- LaneInvasionSensor --------------------------------------------------------
-# ==============================================================================
-
-
-class LaneInvasionSensor(object):
-    def __init__(self, parent_actor, hud):
-        self.sensor = None
-        self._parent = parent_actor
-        self.hud = hud
-        world = self._parent.get_world()
-        bp = world.get_blueprint_library().find('sensor.other.lane_invasion')
-        self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
-        # We need to pass the lambda a weak reference to self to avoid circular
-        # reference.
-        weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(weak_self, event))
-
-    @staticmethod
-    def _on_invasion(weak_self, event):
-        self = weak_self()
-        if not self:
-            return
-        lane_types = set(x.type for x in event.crossed_lane_markings)
-        text = ['%r' % str(x).split()[-1] for x in lane_types]
-        self.hud.notification('Crossed line %s' % ' and '.join(text))
-
-# ==============================================================================
-# -- GnssSensor --------------------------------------------------------
-# ==============================================================================
-
-
-class GnssSensor(object):
-    def __init__(self, parent_actor):
-        self.sensor = None
-        self._parent = parent_actor
-        self.lat = 0.0
-        self.lon = 0.0
-        world = self._parent.get_world()
-        bp = world.get_blueprint_library().find('sensor.other.gnss')
-        self.sensor = world.spawn_actor(bp, carla.Transform(carla.Location(x=1.0, z=2.8)), attach_to=self._parent)
-        # We need to pass the lambda a weak reference to self to avoid circular reference.
-        weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: GnssSensor._on_gnss_event(weak_self, event))
-
-    @staticmethod
-    def _on_gnss_event(weak_self, event):
-        self = weak_self()
-        if not self:
-            return
-        self.lat = event.latitude
-        self.lon = event.longitude
-
-
-# ==============================================================================
 # -- game_loop() ---------------------------------------------------------------
 # ==============================================================================
 # The game loop now will instantiate an arduino object that stores the connection
@@ -712,7 +589,7 @@ def game_loop(args):
 
         hud = HUD(display_size[0], display_size[1])
         world = World(client.get_world(), hud, args)
-        controller = DualControl(world, start_in_autopilot=False)
+        controller = DualControl(world)
 
         clock = pygame.time.Clock()
         while True:
@@ -816,8 +693,6 @@ def main():
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
-
-    print(__doc__)
 
     try:
         game_loop(args)
