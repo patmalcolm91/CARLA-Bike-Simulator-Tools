@@ -20,6 +20,14 @@ def get_actor_display_name(actor, truncate=250):
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
 
+def move_spectator_to_actor(spectator, actor):
+    actor_transform = actor.get_transform()  # type: carla.Transform
+    a_rot = actor_transform.rotation  # type: carla.Rotation
+    new_loc = actor_transform.transform(carla.Vector3D(-3, 0, 3))
+    new_rot = carla.Rotation(roll=a_rot.roll, pitch=a_rot.pitch-30, yaw=a_rot.yaw)
+    spectator.set_transform(carla.Transform(new_loc, new_rot))
+
+
 def run_manager(host, port):
     # Initialize carla client and get necessary information
     client = carla.Client(host, port)
@@ -28,6 +36,7 @@ def run_manager(host, port):
     weather_presets = find_weather_presets()  # returns dict {name: weather_params}
     vehicles = world.get_actors().filter('vehicle.*')  # type: list[carla.Actor]
     vehicles_dict = {veh.attributes["role_name"]: veh for veh in vehicles}
+    spectator = world.get_spectator()
 
     # Create GUI
     root = tk.Tk()
@@ -53,6 +62,10 @@ def run_manager(host, port):
     emergency_stop_button = tk.Button(main_frame, text="Stop Ego",
                                       command=lambda: vehicles_dict[tkego.get()].set_velocity(carla.Vector3D(0, 0, 0))
                                       ).grid(row=3, column=1)
+    tr = carla.Transform(carla.Location(0, -1, 3), carla.Rotation(0, 0, 0))
+    snap_to_ego = tk.Button(main_frame, text="Snap to Ego",
+                            command=lambda: move_spectator_to_actor(spectator, vehicles_dict[tkego.get()])
+                            ).grid(row=3, column=2)
 
     # Start GUI main loop
     root.mainloop()
