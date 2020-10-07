@@ -172,7 +172,7 @@ class World(object):
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index)
         actor_type = get_actor_display_name(self.player)
-        self.hud.notification(actor_type)
+        self.hud.notification("Ego Vehicle Type: " + actor_type)
 
         # if engine is True the new engine setup will be applied to the vehicle
         if engine:
@@ -238,7 +238,6 @@ class DualControl(object):
         else:
             raise NotImplementedError("Actor type not supported")
         self._steer_cache = 0.0
-        world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self, world, clock, bike_sensor):
         for event in pygame.event.get():
@@ -251,8 +250,6 @@ class DualControl(object):
                     world.restart()
                 elif event.key == K_F1:
                     world.hud.toggle_info()
-                elif event.key == K_h or (event.key == K_SLASH and pygame.key.get_mods() & KMOD_SHIFT):
-                    world.hud.help.toggle()
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif K_0 < event.key <= K_9:
@@ -342,11 +339,10 @@ class HUD(object):
         mono = pygame.font.match_font(mono)
         self._font_mono = pygame.font.Font(mono, 12 if os.name == 'nt' else 14)
         self._notifications = FadingText(font, (width, 40), (0, height - 40))
-        self.help = HelpText(pygame.font.Font(mono, 24), width, height)
         self.server_fps = 0
         self.frame = 0
         self.simulation_time = 0
-        self._show_info = True  # change this to False if the simulator shall launch without HUD
+        self._show_info = False  # whether the HUD should be displayed by default
         self._info_text = []
         self._server_clock = pygame.time.Clock()
 
@@ -459,7 +455,6 @@ class HUD(object):
                     display.blit(surface, (8, v_offset))
                 v_offset += 18
         self._notifications.render(display)
-        self.help.render(display)
 
 
 # ==============================================================================
@@ -489,34 +484,6 @@ class FadingText(object):
 
     def render(self, display):
         display.blit(self.surface, self.pos)
-
-
-# ==============================================================================
-# -- HelpText ------------------------------------------------------------------
-# ==============================================================================
-
-
-class HelpText(object):
-    def __init__(self, font, width, height):
-        lines = __doc__.split('\n')
-        self.font = font
-        self.dim = (680, len(lines) * 22 + 12)
-        self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
-        self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
-        self.surface.fill((0, 0, 0, 0))
-        for n, line in enumerate(lines):
-            text_texture = self.font.render(line, True, (255, 255, 255))
-            self.surface.blit(text_texture, (22, n * 22))
-            self._render = False
-        self.surface.set_alpha(220)
-
-    def toggle(self):
-        self._render = not self._render
-
-    def render(self, display):
-        if self._render:
-            display.blit(self.surface, self.pos)
 
 
 # ==============================================================================
