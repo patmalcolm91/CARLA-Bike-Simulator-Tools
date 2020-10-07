@@ -57,6 +57,7 @@ import weakref
 
 from CameraManager import CameraManager
 from BikeSensor import BikeSensor
+from VehicleDynamics import VehicleDynamicsPaul, VehicleDynamicsKeyboard
 
 if sys.version_info >= (3, 0):
 
@@ -145,10 +146,10 @@ class World(object):
         self.camera_manager = None
         self._actor_filter = args.filter
         self.camera_params = {k: getattr(args, k) for k in CameraManager.DEFAULT_PARAMS}
-        self.restart(engine=True)  # On World instantiation use bicycle and new engine setup
+        self.restart()  # On World instantiation use bicycle and new engine setup
         self.world.on_tick(hud.on_world_tick)
 
-    def restart(self, engine=False):
+    def restart(self):
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
@@ -175,30 +176,6 @@ class World(object):
         actor_type = get_actor_display_name(self.player)
         self.hud.notification("Ego Vehicle Type: " + actor_type)
 
-        # if engine is True the new engine setup will be applied to the vehicle
-        if engine:
-            physics = self.player.get_physics_control()
-            physics.max_rpm = 500
-            physics.torque_curve = [
-                (0, 200),
-                (200, 200),
-                (500, 30)
-            ]
-            physics.steering_curve = [
-                (0, 1),
-                (55, 0.2),
-                (120, 0.1)
-            ]
-            # Theoretic setup to adjust engine to use a single gear:
-            # physics.forward_gears = [
-            #   carla.GearPhysicsControl(
-            #       ratio = float(XX),
-            #       down_ratio = float(XX),
-            #       up_ratio = float(XX)
-            #       )
-            # ]
-            self.player.apply_physics_control(physics)
-
     def tick(self, clock):
         self.hud.tick(self, clock)
 
@@ -220,26 +197,14 @@ class World(object):
 # -- DualControl -----------------------------------------------------------
 # ==============================================================================
 # DualControl was updated to allow for the simulator sensor outputs to be the
-# controller. 'brake_threshold' was added along the 'throttle' and 'brake'
-# variables which are needed as references in the driving dynamics algorithms.
-# parse_events() and _parse_vehicle_wheel() now take an additional arduino input.
-# The new 'steering_scale' and 'throttle_scale' variables can be adjusted in the
-# class instantiation.
-
+# controller.
 
 class DualControl(object):
     def __init__(self, world):
         self.keyboard_control_mode = False
-        self.brake_threshold = 0.0025  # new brake_threshold variable
-        self.steering_scale = 90  # set value by which steering shall be scaled
-        self.throttle_scale = 1600  # set value by how much speed shall be scaled
-        self.throttle = 0  # new variable to store reference throttle
-        self.brake = 0  # new variable to store reference brake
-        if isinstance(world.player, carla.Vehicle):
-            self._control = carla.VehicleControl()
-        else:
-            raise NotImplementedError("Actor type not supported")
         self._steer_cache = 0.0
+        self._vehicle_dynamics = VehicleDynamicsPaul(world.player)
+        self._keyboard_vehicle_dynamics = VehicleDynamicsKeyboard(world.player)
 
     def parse_events(self, world, clock, bike_sensor):
         for event in pygame.event.get():
@@ -259,68 +224,19 @@ class DualControl(object):
                 elif event.key == K_c:
                     self.keyboard_control_mode = not self.keyboard_control_mode
                     world.hud.notification("Keyboard Control Mode" if self.keyboard_control_mode else "Simulator Control Mode")
-                elif event.key == K_q:
-                    self._control.gear = 1 if self._control.reverse else -1
-                elif event.key == K_m:
-                    self._control.manual_gear_shift = not self._control.manual_gear_shift
-                    self._control.gear = world.player.get_control().gear
-                    world.hud.notification('%s Transmission' %
-                                           ('Manual' if self._control.manual_gear_shift else 'Automatic'))
-                elif self._control.manual_gear_shift and event.key == K_COMMA:
-                    self._control.gear = max(-1, self._control.gear - 1)
-                elif self._control.manual_gear_shift and event.key == K_PERIOD:
-                    self._control.gear = self._control.gear + 1
+                else:
+                    self._keyboard_vehicle_dynamics.tick(event, pygame.key.get_pressed(), clock.get_time())
 
             if self.keyboard_control_mode:
-                self._parse_vehicle_keyboard_input(pygame.key.get_pressed(), clock.get_time())
+                self._keyboard_vehicle_dynamics.tick(event, pygame.key.get_pressed(), clock.get_time())
             else:
                 self._parse_vehicle_controller_input(bike_sensor)
-            self._control.reverse = self._control.gear < 0
-            world.player.apply_control(self._control)
-
-    def _parse_vehicle_keyboard_input(self, keys, milliseconds):
-        self._control.throttle = 1.0 if keys[K_UP] or keys[K_w] else 0.0
-        steer_increment = 5e-4 * milliseconds
-        if keys[K_LEFT] or keys[K_a]:
-            self._steer_cache -= steer_increment
-        elif keys[K_RIGHT] or keys[K_d]:
-            self._steer_cache += steer_increment
-        else:
-            self._steer_cache = 0.0
-        self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
-        self._control.steer = round(self._steer_cache, 1)
-        self._control.brake = 1.0 if keys[K_DOWN] or keys[K_s] else 0.0
-        self._control.hand_brake = keys[K_SPACE]
 
     def _parse_vehicle_controller_input(self, bike_sensor):
-
         # request sensor outputs from arduino
         speed, steering = bike_sensor.get_speed_and_steering()
-
-        # scale and apply steering
-        self._control.steer = steering/self.steering_scale
-
-        # check if speed value has changed
-        #   check if speed decrease exceeds brake_threshold else set brake to 0
-        #       set brake to how much brake_threshold is exceeded
-        # cosmetic: if throttle is 0 set brake to 0
-        # store reference brake value
-        if self.throttle != speed/self.throttle_scale:
-            if self.throttle - speed/self.throttle_scale > self.brake_threshold:
-                self.brake = self.throttle - (speed/self.throttle_scale + self.brake_threshold)
-            else:
-                self.brake = 0
-        elif self.throttle == 0:
-            self.brake = 0
-        self._control.brake = self.brake
-
-        # scale simulator speed output and limit to maximum 1
-        # store reference throttle value
-        if speed/self.throttle_scale >= 1:
-            self._control.throttle = 1
-        else:
-            self._control.throttle = speed/self.throttle_scale
-        self.throttle = speed/self.throttle_scale
+        # send the sensor readings to the vehicle dynamics module
+        self._vehicle_dynamics.tick(speed_input=speed, steering_input=steering)
 
     @staticmethod
     def _is_quit_shortcut(key):
