@@ -154,6 +154,7 @@ class World(object):
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
 
         blueprint = self.world.get_blueprint_library().find('vehicle.diamondback.century')
+        blueprint.set_attribute("role_name", self.actor_role_name)
         # Spawn the player.
         if self.player is not None:
             spawn_point = self.player.get_transform()
