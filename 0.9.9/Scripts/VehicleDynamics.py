@@ -77,6 +77,14 @@ class VehicleDynamicsPaul(VehicleDynamics):
             (55, 0.2),
             (120, 0.1)
         ]
+        # Theoretical setup to adjust engine to use a single gear:
+        # physics.forward_gears = [
+        #   carla.GearPhysicsControl(
+        #       ratio = float(XX),
+        #       down_ratio = float(XX),
+        #       up_ratio = float(XX)
+        #       )
+        # ]
         self.player.apply_physics_control(self.physics)
 
     def tick(self, speed_input, steering_input):
