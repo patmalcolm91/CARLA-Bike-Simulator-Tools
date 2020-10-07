@@ -228,6 +228,7 @@ class World(object):
 
 class DualControl(object):
     def __init__(self, world):
+        self.keyboard_control_mode = False
         self.brake_threshold = 0.0025  # new brake_threshold variable
         self.steering_scale = 90  # set value by which steering shall be scaled
         self.throttle_scale = 1600  # set value by how much speed shall be scaled
@@ -254,6 +255,9 @@ class DualControl(object):
                     world.camera_manager.next_sensor()
                 elif K_0 < event.key <= K_9:
                     world.camera_manager.set_sensor(event.key - 1 - K_0)
+                elif event.key == K_c:
+                    self.keyboard_control_mode = not self.keyboard_control_mode
+                    world.hud.notification("Keyboard Control Mode" if self.keyboard_control_mode else "Simulator Control Mode")
                 elif event.key == K_q:
                     self._control.gear = 1 if self._control.reverse else -1
                 elif event.key == K_m:
@@ -266,10 +270,12 @@ class DualControl(object):
                 elif self._control.manual_gear_shift and event.key == K_PERIOD:
                     self._control.gear = self._control.gear + 1
 
+            if self.keyboard_control_mode:
                 self._parse_vehicle_keyboard_input(pygame.key.get_pressed(), clock.get_time())
+            else:
                 self._parse_vehicle_controller_input(bike_sensor)
-                self._control.reverse = self._control.gear < 0
-                world.player.apply_control(self._control)
+            self._control.reverse = self._control.gear < 0
+            world.player.apply_control(self._control)
 
     def _parse_vehicle_keyboard_input(self, keys, milliseconds):
         self._control.throttle = 1.0 if keys[K_UP] or keys[K_w] else 0.0
