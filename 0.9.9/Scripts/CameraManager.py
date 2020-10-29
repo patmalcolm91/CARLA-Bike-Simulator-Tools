@@ -96,8 +96,12 @@ class CameraManager(object):
 
     def render(self, display):
         if self.surface is not None:
-            # scale surface to display size
-            display.blit(pygame.transform.scale(self.surface, self.display_size), (0, 0))
+            # scale surface to display size if necessary
+            if self.surface.get_size() == self.display_size:
+                _img = self.surface
+            else:
+                _img = pygame.transform.smoothscale(self.surface, self.display_size)
+            display.blit(_img, (0, 0))
 
     @staticmethod
     def _parse_image(weak_self, image):
