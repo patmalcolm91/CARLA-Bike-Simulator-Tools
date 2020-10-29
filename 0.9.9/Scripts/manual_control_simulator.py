@@ -54,6 +54,7 @@ import math
 import random
 import re
 import weakref
+import warnings
 
 from CameraManager import CameraManager
 from BikeSensor import BikeSensor
@@ -117,6 +118,11 @@ class World(object):
             sys.exit(1)
 
         self.hud = hud
+        scenario_cfg = {}
+        if args.scenario_config is not None:
+            with open(args.scenario_config) as f:
+                scenario_cfg = yaml.load(f, Loader=yaml.Loader)
+        self.instructions_hud = InstructionImageHUD(config=scenario_cfg.get("instruction_images", {}))
         self.player = None
         self.collision_sensor = None
         self.camera_manager = None
@@ -158,6 +164,7 @@ class World(object):
     def render(self, display):
         self.camera_manager.render(display)
         self.hud.render(display)
+        self.instructions_hud.render(display)
 
     def destroy(self):
         actors = [
@@ -222,6 +229,34 @@ class DualControl(object):
 # ==============================================================================
 # -- HUD -----------------------------------------------------------------------
 # ==============================================================================
+
+
+class InstructionImageHUD(object):
+    _defaults = {"size": (100, 100), "pos": (0, 0)}
+
+    def __init__(self, config):
+        user_defaults = config.pop("default", {})
+        self._images = {}
+        self._positions = {}
+        for key in config:
+            cfg = {**self._defaults, **user_defaults, **config[key]}
+            self._images[key] = pygame.transform.smoothscale(pygame.image.load(cfg["path"]), tuple(cfg["size"]))
+            self._positions[key] = tuple(cfg["pos"])
+        self.current = None
+
+    def clear(self):
+        self.current = None
+
+    def set_current(self, image_key):
+        self.current = image_key
+
+    def render(self, display):
+        if self.current is None:
+            return
+        if self.current in self._images:
+            display.blit(self._images[self.current], self._positions[self.current])
+        else:
+            warnings.warn("Image key \"" + str(self.current) + "\" not associated with an image.")
 
 
 class HUD(object):
@@ -539,6 +574,11 @@ def main():
         '--display_name',
         metavar='display_name',
         help='Name of display. Used to get parameters from config file.')
+    argparser.add_argument(
+        '--scenario_config',
+        type=str,
+        default=None,
+        help='Path to YAML config file containing scenario settings.')
     args = argparser.parse_args()
 
     if args.config is not None:

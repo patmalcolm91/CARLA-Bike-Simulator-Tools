@@ -1,0 +1,7 @@
+# Scenario configuration file
+instruction_images:
+  default:
+    size: [200, 200]
+    pos: [50, 50]
+  1:
+    path: test.jpg
