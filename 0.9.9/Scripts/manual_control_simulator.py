@@ -59,6 +59,7 @@ import warnings
 from CameraManager import CameraManager
 from BikeSensor import BikeSensor
 from VehicleDynamics import VehicleDynamicsPaul, VehicleDynamicsKeyboard
+from DataSync import Server as DataSyncServer
 
 if sys.version_info >= (3, 0):
 
@@ -123,6 +124,13 @@ class World(object):
             with open(args.scenario_config) as f:
                 scenario_cfg = yaml.load(f, Loader=yaml.Loader)
         self.instructions_hud = InstructionImageHUD(config=scenario_cfg.get("instruction_images", {}))
+        self.data_sync_server = None
+        self.data_sync_instr_image_index = None
+        if "message_servers" in scenario_cfg:
+            if "instruction_images" in scenario_cfg:
+                dscfg = scenario_cfg["message_servers"]["instruction_images"]
+                self.data_sync_server = DataSyncServer(ip=dscfg["ip"], port=dscfg["port"], fmt=dscfg["fmt"])
+                self.data_sync_instr_image_index = dscfg["index"]
         self.player = None
         self.collision_sensor = None
         self.camera_manager = None
@@ -160,6 +168,11 @@ class World(object):
 
     def tick(self, clock):
         self.hud.tick(self, clock)
+        msgs = self.data_sync_server.get_messages()
+        if len(msgs) > 0:
+            msg = msgs[-1]
+            instruction = msg if self.data_sync_instr_image_index is None else msg[self.data_sync_instr_image_index]
+            self.instructions_hud.set_current(instruction)
 
     def render(self, display):
         self.camera_manager.render(display)

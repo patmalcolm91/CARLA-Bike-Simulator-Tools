@@ -1,4 +1,10 @@
 # Scenario configuration file
+message_servers:
+  instruction_images:
+    ip: 127.0.0.1
+    port: 30001
+    fmt: "!dd"
+    index: 1
 instruction_images:
   default:
     size: [200, 200]
