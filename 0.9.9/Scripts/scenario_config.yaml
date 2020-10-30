@@ -5,6 +5,11 @@ message_servers:
     port: 30001
     fmt: "!dd"
     index: 1
+ego:
+  blueprint: vehicle.diamondback.century
+  role_name: hero
+  start_pos: [0, 0, 2]
+  start_yaw: 0
 instruction_images:
   default:
     size: [200, 200]

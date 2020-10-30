@@ -132,6 +132,18 @@ class World(object):
                 self.data_sync_server = DataSyncServer(ip=dscfg["ip"], port=dscfg["port"], fmt=dscfg["fmt"])
                 self.data_sync_instr_image_index = dscfg["index"]
         self.player = None
+        self._player_blueprint_name = "vehicle.diamondback.century"
+        self._player_start_pos = None
+        self._player_start_yaw = None
+        if "ego" in scenario_cfg:
+            if "blueprint" in scenario_cfg["ego"]:
+                self._player_blueprint_name = scenario_cfg["ego"]["blueprint"]
+            if "start_pos" in scenario_cfg["ego"]:
+                self._player_start_pos = tuple(scenario_cfg["ego"]["start_pos"])
+            if "role_name" in scenario_cfg["ego"]:
+                self.actor_role_name = scenario_cfg["ego"]["role_name"]
+            if "start_yaw" in scenario_cfg["ego"]:
+                self._player_start_yaw = scenario_cfg["ego"]["start_yaw"]
         self.collision_sensor = None
         self.camera_manager = None
         self._actor_filter = args.filter
@@ -144,7 +156,7 @@ class World(object):
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
 
-        blueprint = self.world.get_blueprint_library().find('vehicle.diamondback.century')
+        blueprint = self.world.get_blueprint_library().find(self._player_blueprint_name)
         blueprint.set_attribute("role_name", self.actor_role_name)
         # Spawn the player.
         if self.player is not None:
@@ -155,8 +167,12 @@ class World(object):
             self.destroy()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         while self.player is None:
-            spawn_points = self.world.get_map().get_spawn_points()
-            spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
+            if self._player_start_pos is None:
+                spawn_points = self.world.get_map().get_spawn_points()
+                spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
+            else:
+                spawn_point = carla.Transform(carla.Location(*self._player_start_pos),
+                                              carla.Rotation(roll=0, pitch=0, yaw=self._player_start_yaw))
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
