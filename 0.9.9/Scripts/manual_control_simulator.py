@@ -172,6 +172,7 @@ class World(object):
         if len(msgs) > 0:
             msg = msgs[-1]
             instruction = msg if self.data_sync_instr_image_index is None else msg[self.data_sync_instr_image_index]
+            instruction = instruction if instruction != 0 else None
             self.instructions_hud.set_current(instruction)
 
     def render(self, display):
