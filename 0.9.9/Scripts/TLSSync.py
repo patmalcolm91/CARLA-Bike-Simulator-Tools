@@ -31,6 +31,16 @@ def tls_sumo_to_carla(sumo_tls_state):
 
 class TLSSync:
     def __init__(self, world, net_file, config_file=None):
+        """
+        Class for controlling CARLA TrafficLight objects based on SUMO TLS states with a user-defined mapping.
+
+        :param world: carla World object for a currently connected CARLA client
+        :type world: carla.World
+        :param net_file: path to the SUMO net file
+        :type net_file: str
+        :param config_file: path to YAML config file containing mappings from CARLA TrafficLight to SUMO TLS
+        :type config_file: str
+        """
         self.world = world
         self.net_file = net_file
         self.net = SumoNetVis.Net(self.net_file)
@@ -45,6 +55,7 @@ class TLSSync:
                 self.config = {str(k): self.config[k] for k in self.config}
 
     def _associate_to_junctions(self):
+        """Find the nearest junction for each CARLA TrafficLight object."""
         self._nearest_junctions = []
         ox, oy = self.net.netOffset
         for tl in self.carla_tls:
@@ -75,6 +86,7 @@ class TLSSync:
                 tl.set_state(carla_state)
 
     def plot(self, ax=None):
+        """Plot the SUMO net, all CARLA TrafficLight objects in the current world, and any configured TLS links."""
         if ax is None:
             ax = plt.gca()
         self.net.plot(ax, apply_netOffset=True, alpha=0.4)
