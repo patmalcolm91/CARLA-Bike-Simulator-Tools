@@ -1,0 +1,13 @@
+# Configuration file mapping carla pole_index to SUMO connection index at junctions
+# File should have following format:
+# sumo_junction_id:
+#   carla_pole_index: sumo_connection_index
+804:
+  0: 1
+  1: 12
+  2: 5
+569:
+  0: 10
+  1: 7
+  2: 4
+  3: 1
