@@ -11,9 +11,22 @@ from shapely.geometry import Point
 import yaml
 
 import carla
+import traci
 
 CMAP = plt.get_cmap("Set3")
 RADIUS = 3
+
+
+def tls_sumo_to_carla(sumo_tls_state):
+    """Maps a sumo TLS state to a carla one."""
+    if sumo_tls_state == "r":
+        return carla.TrafficLightState.Red
+    elif sumo_tls_state in "uyY":
+        return carla.TrafficLightState.Yellow
+    elif sumo_tls_state in "gG":
+        return carla.TrafficLightState.Green
+    else:
+        return carla.TrafficLightState.Off
 
 
 class TLSSync:
@@ -49,6 +62,17 @@ class TLSSync:
                 if best_dist <= 0:
                     break
             self._nearest_junctions.append(best_jn)
+
+    def tick(self):
+        """Update CARLA TLS states based on SUMO TLS states. Should be run every simulation step."""
+        sumo_states = {jn: traci.trafficlight.getRedYellowGreenState(jn) for jn in set(self._nearest_junctions)}
+        for tl, junction in zip(self.carla_tls, self._nearest_junctions):  # type: carla.TrafficLight, str
+            pole_index = tl.get_pole_index()
+            if junction in self.config and pole_index in self.config[junction]:
+                sumo_state = sumo_states[junction][self.config[junction][pole_index]]
+                carla_state = tls_sumo_to_carla(sumo_state)
+                tl.freeze(True)
+                tl.set_state(carla_state)
 
     def plot(self, ax=None):
         if ax is None:
