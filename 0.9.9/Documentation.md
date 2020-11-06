@@ -22,6 +22,22 @@ with open("../Sample/AtCity_Study2.obj", "w") as f:
     f.write(net.generate_obj_text(terrain_distance=100, material_mapping=carla_materials, apply_netOffset=True))
 ```
 
+The generated OBJ file can then be imported into Blender (be sure to set axis configuration to Y-Forward, Z-Up).
+The geometry can then be manually cleaned up in Blender. It is also recommended to use the following blender script:
+
+```python
+import bpy
+
+# Loops through all selected mesh objects and merges vertices that are close together and triangulates all faces
+for obj in bpy.context.selected_objects:
+    if obj.type == "MESH":
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.remove_doubles(threshold=0.001)
+        bpy.ops.mesh.quads_convert_to_tris(quad_method="BEAUTY", ngon_method="BEAUTY")
+        bpy.ops.object.editmode_toggle()
+```
+
 ## Importing 3D Geometry into CARLA
 TODO
 
