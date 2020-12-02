@@ -184,7 +184,10 @@ class World(object):
 
     def tick(self, clock):
         self.hud.tick(self, clock)
-        msgs = self.data_sync_server.get_messages()
+        if self.data_sync_server is not None:
+            msgs = self.data_sync_server.get_messages()
+        else:
+            msgs = []
         if len(msgs) > 0:
             msg = msgs[-1]
             instruction = msg if self.data_sync_instr_image_index is None else msg[self.data_sync_instr_image_index]
