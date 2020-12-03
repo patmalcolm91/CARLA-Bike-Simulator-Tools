@@ -147,7 +147,8 @@ class World(object):
         self.collision_sensor = None
         self.camera_manager = None
         self._actor_filter = args.filter
-        self.camera_params = {k: getattr(args, k) for k in CameraManager.DEFAULT_PARAMS}
+        self.camera_params = {k: getattr(args, k, CameraManager.DEFAULT_PARAMS[k]) for k in
+                              CameraManager.DEFAULT_PARAMS}
         self.restart()  # On World instantiation use bicycle and new engine setup
         self.world.on_tick(hud.on_world_tick)
 
