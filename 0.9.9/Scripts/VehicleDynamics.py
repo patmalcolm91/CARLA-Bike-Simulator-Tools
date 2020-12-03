@@ -118,13 +118,13 @@ class VehicleDynamicsKeyboard(VehicleDynamics):
             if event.key == K_q:
                 self._control.gear = 1 if self._control.reverse else -1
 
-        elif event.key == K_m:
-            self._control.manual_gear_shift = not self._control.manual_gear_shift
-            self._control.gear = self.player.get_control().gear
-        elif self._control.manual_gear_shift and event.key == K_COMMA:
-            self._control.gear = max(-1, self._control.gear - 1)
-        elif self._control.manual_gear_shift and event.key == K_PERIOD:
-            self._control.gear = self._control.gear + 1
+            elif event.key == K_m:
+                self._control.manual_gear_shift = not self._control.manual_gear_shift
+                self._control.gear = self.player.get_control().gear
+            elif self._control.manual_gear_shift and event.key == K_COMMA:
+                self._control.gear = max(-1, self._control.gear - 1)
+            elif self._control.manual_gear_shift and event.key == K_PERIOD:
+                self._control.gear = self._control.gear + 1
 
         self._control.throttle = 1.0 if keys[K_UP] or keys[K_w] else 0.0
         steer_increment = 5e-4 * milliseconds
