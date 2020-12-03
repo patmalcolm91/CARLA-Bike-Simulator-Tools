@@ -114,8 +114,9 @@ class VehicleDynamicsKeyboard(VehicleDynamics):
         self._steer_cache = 0
 
     def tick(self, event, keys, milliseconds):
-        if event.key == K_q:
-            self._control.gear = 1 if self._control.reverse else -1
+        if hasattr(event, "key"):
+            if event.key == K_q:
+                self._control.gear = 1 if self._control.reverse else -1
 
         elif event.key == K_m:
             self._control.manual_gear_shift = not self._control.manual_gear_shift
