@@ -119,12 +119,12 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
       * https://www.coursera.org/lecture/intro-self-driving-cars/lesson-5-lateral-dynamics-of-bicycle-model-1Opvo
       * https://www.bvl.de/files/1951/1988/1852/2239/10.23773-2017_1.pdf
     """
-    def __init__(self, actor, start_yaw=0, rpm_factor=1600, start_v=0, start_delta=0):
+    def __init__(self, actor, start_yaw=None, rpm_factor=1600, start_v=0, start_delta=0):
         """
         Initialize a VehicleDynamicsSingleTrack instance.
 
         :param actor: carla actor object to control
-        :param start_yaw: the starting orientation of the actor
+        :param start_yaw: the starting orientation of the actor. If none, will default to actor's yaw.
         :param rpm_factor: rpm corresponding to 1 m/s
         :param start_v: starting velocity (should never need overridden)
         :param start_delta: starting steering input value (should never need overridden)
@@ -135,7 +135,10 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         self.player.set_simulate_physics(False)
 
         self.b = 0.0  # side slip angle
-        self.yaw = start_yaw
+        if start_yaw is None:
+            self.yaw = self.player.get_transform().rotation.yaw
+        else:
+            self.yaw = start_yaw
         self.sol = ode(self.singletrack_fun).set_integrator("dopri5", max_step=0.050)
         self.sol.set_initial_value([0, self.b]).set_f_params(start_v, start_delta)
 
