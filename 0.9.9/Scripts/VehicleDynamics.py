@@ -132,7 +132,6 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         super().__init__(actor)
 
         self.rpm_factor = rpm_factor
-        self.physics = self.player.get_physics_control()
         self.player.set_simulate_physics(False)
 
         self.b = 0.0  # side slip angle
