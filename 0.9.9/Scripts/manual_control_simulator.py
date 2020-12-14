@@ -58,7 +58,7 @@ import warnings
 
 from CameraManager import CameraManager
 from BikeSensor import BikeSensor
-from VehicleDynamics import VehicleDynamicsPaul, VehicleDynamicsKeyboard
+from VehicleDynamics import VehicleDynamicsPaul, VehicleDynamicsKeyboard, VehicleDynamicsSingleTrack
 from DataSync import Server as DataSyncServer
 
 if sys.version_info >= (3, 0):
@@ -220,8 +220,10 @@ class DualControl(object):
     def __init__(self, world):
         self.keyboard_control_mode = False
         self._steer_cache = 0.0
-        self._vehicle_dynamics = VehicleDynamicsPaul(world.player)
+        self._vehicle_dynamics = VehicleDynamicsPaul(world.player, steering_scale=135)
+        self._bike_dynamics = VehicleDynamicsSingleTrack(world.player)
         self._keyboard_vehicle_dynamics = VehicleDynamicsKeyboard(world.player)
+        self.sim_model = "bike"
 
     def parse_events(self, world, clock, bike_sensor):
         for event in pygame.event.get():
@@ -244,16 +246,19 @@ class DualControl(object):
                 else:
                     self._keyboard_vehicle_dynamics.tick(event, pygame.key.get_pressed(), clock.get_time())
 
-            if self.keyboard_control_mode:
-                self._keyboard_vehicle_dynamics.tick(event, pygame.key.get_pressed(), clock.get_time())
-            else:
-                self._parse_vehicle_controller_input(bike_sensor)
+        if self.keyboard_control_mode:
+            self._keyboard_vehicle_dynamics.tick(event, pygame.key.get_pressed(), clock.get_time())
+        else:
+            self._parse_vehicle_controller_input(bike_sensor, clock)
 
-    def _parse_vehicle_controller_input(self, bike_sensor):
+    def _parse_vehicle_controller_input(self, bike_sensor, clock):
         # request sensor outputs from arduino
         speed, steering = bike_sensor.get_speed_and_steering()
         # send the sensor readings to the vehicle dynamics module
-        self._vehicle_dynamics.tick(speed_input=speed, steering_input=steering)
+        if self.sim_model == "bike":
+            self._bike_dynamics.tick(speed_input=speed, steering_input=steering, milliseconds=clock.get_time())
+        else:
+            self._vehicle_dynamics.tick(speed_input=speed, steering_input=steering)
 
     @staticmethod
     def _is_quit_shortcut(key):
