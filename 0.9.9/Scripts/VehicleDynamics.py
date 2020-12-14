@@ -168,21 +168,18 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         """
         if v == 0:
             return [0, 0]  # no change in yaw rate or side slip angle when not moving
-
-        u = delta
+        # define A, B, and u
         A11 = -(1 / v) * (self.cav * (self.lv ** 2) + self.cah * (self.lh ** 2)) / self.theta
         A12 = -(self.cav * self.lv - self.cah * self.lh) / self.theta
         A21 = -1 - (1 / v ** 2) * (self.cav * self.lv - self.cah * self.lh) / self.m
         A22 = -(1 / v) * (self.cav + self.cah) / self.m
-
         B11 = self.cav * self.lv / self.theta
         B12 = (1 / v) * (self.cav / self.m)
-
         A = np.array([[A11, A12], [A21, A22]])
         B = np.array([B11, B12])
-
+        u = delta
+        # calculate and return x'=Ax+Bu
         xprime = np.dot(A, x) + np.dot(B, u)
-
         return np.array([xprime[0], xprime[1]])
 
     def tick(self, speed_input, steering_input, time_step):
@@ -200,7 +197,7 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
 
         # Perform the integration
         self.sol.set_f_params(v, delta)
-        yaw_rate, b = self.sol.integrate(self.sol.t+time_step/1000)  # return result from differential equytion of single track model motion
+        yaw_rate, b = self.sol.integrate(self.sol.t+time_step/1000)
 
         # store results at class level
         self.b = b
