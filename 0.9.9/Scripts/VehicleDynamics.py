@@ -139,7 +139,7 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
             self.yaw = self.player.get_transform().rotation.yaw
         else:
             self.yaw = start_yaw
-        self.sol = ode(self.singletrack_fun).set_integrator("dopri5", max_step=0.050)
+        self.sol = ode(self._single_track_func).set_integrator("dopri5", max_step=0.050)
         self.sol.set_initial_value([0, self.b]).set_f_params(start_v, start_delta)
 
         self.L = 0.1  # in m
@@ -157,7 +157,7 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         self.m_rider = 65  # mass of rider
         self.m = self.m_bike + self.m_rider  # mass of bike + mass of rider
 
-    def singletrack_fun(self, t, x, v, delta):
+    def _single_track_func(self, t, x, v, delta):
         """
         Vehicle dynamics by Schramm et al. 2018 (DOI: 10.1007/978-3-662-54483-9)
 
