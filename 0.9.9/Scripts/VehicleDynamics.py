@@ -110,8 +110,25 @@ class VehicleDynamicsPaul(VehicleDynamics):
 
 
 class VehicleDynamicsSingleTrack(VehicleDynamics):
-    """Vehicle Dynamics Model developed by Georgios Grigoropoulos"""
+    """
+    Vehicle Dynamics Model implementing Single Track Model
+    developed by Georgios Grigoropoulos and Patrick Malcolm
+
+    For more information on the various parameters of the model, see the full single track model documentation:
+      * Vehicle dynamics by Schramm et al. 2018 (DOI: 10.1007/978-3-662-54483-9)
+      * https://www.coursera.org/lecture/intro-self-driving-cars/lesson-5-lateral-dynamics-of-bicycle-model-1Opvo
+      * https://www.bvl.de/files/1951/1988/1852/2239/10.23773-2017_1.pdf
+    """
     def __init__(self, actor, start_yaw=0, rpm_factor=1600, start_v=0, start_delta=0):
+        """
+        Initialize a VehicleDynamicsSingleTrack instance.
+
+        :param actor: carla actor object to control
+        :param start_yaw: the starting orientation of the actor
+        :param rpm_factor: rpm corresponding to 1 m/s
+        :param start_v: starting velocity (should never need overridden)
+        :param start_delta: starting steering input value (should never need overridden)
+        """
         super().__init__(actor)
 
         self.rpm_factor = rpm_factor
@@ -124,16 +141,16 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         self.sol.set_initial_value([0, self.b]).set_f_params(start_v, start_delta)
 
         self.L = 0.1  # in m
-        self.f = 0.3  # factor descripbing the porportion of the width of the bike tire that is in contact with the road surface
+        self.f = 0.3  # proportion of width of bike tire in contact with the road surface
         self.br = 0.032 * self.f
-        self.ka = 20000  # self defined constant. This constat is defined for tires through lab experiments
-        self.c = 0.5 * self.br * self.ka * self.L ** 2  # L is approximately the length of the surface covered by the wheel page169 assumption of a constant patch breadth br (width of tire) page171 with a corresponding constant k. The constant depends on
-        self.cav = self.c  # front wheel cornering stiffness  For small slip angles less than 12 degrees a has a linear relationship to the Fy lateral force it is then valid Fy =ca*a page 176(164)
-        self.cah = self.c  # rear wheel cornering stiffness For small slip angles a it is then valid a =ca*a page 176(164)
+        self.ka = 20000  # determined experimentally
+        self.c = 0.5 * self.br * self.ka * self.L ** 2  # approximate length of surface covered by the wheel
+        self.cav = self.c  # front wheel cornering stiffness
+        self.cah = self.c  # rear wheel cornering stiffness
         self.lb = 1.02  # bike body length in meters
         self.lv = 0.43  # distance from the center of gravity to the front wheel
         self.lh = self.lb - self.lv  # distances from the center of gravity to the front
-        self.theta = 2.8  # yaw inertia check  Table 11.8 page 315 thetazz here value is from Meijaard et al.
+        self.theta = 2.8  # yaw inertia (check Table 11.8 page 315; this value is from Meijaard et al.)
         self.m_bike = 6  # mass of bike
         self.m_rider = 65  # mass of rider
         self.m = self.m_bike + self.m_rider  # mass of bike + mass of rider
@@ -141,18 +158,14 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
     def singletrack_fun(self, t, x, v, delta):
         """
         Vehicle dynamics by Schramm et al. 2018 (DOI: 10.1007/978-3-662-54483-9)
-        Example values on page 315
-        https://www.coursera.org/lecture/intro-self-driving-cars/lesson-5-lateral-dynamics-of-bicycle-model-1Opvo
-        https://www.bvl.de/files/1951/1988/1852/2239/10.23773-2017_1.pdf
-        [1] J. P. Meijaard, J. M. Papadopoulos, A. Ruina, and A. L. Schwab, “Linearized dynamics equations for the balance and steer of a bicycle: a benchmark and review,” Proc. R. Soc. A Math. Phys. Eng. Sci., vol. 463, no. 2084, pp. 1955–1982, 2007.
 
         :param t: current time
-        :param x: vector of inputs [psi_dot_V, beta]
+        :param x: vector of inputs [yaw_rate, side_slip_angle]
         :param v: velocity
-        :param delta: steering angle
+        :param delta: steering input angle
         """
         if v == 0:
-            return [0, 0]
+            return [0, 0]  # no change in yaw rate or side slip angle when not moving
 
         u = delta
         A11 = -(1 / v) * (self.cav * (self.lv ** 2) + self.cah * (self.lh ** 2)) / self.theta
@@ -171,21 +184,31 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         return np.array([xprime[0], xprime[1]])
 
     def tick(self, speed_input, steering_input, time_step):
-        delta = steering_input*math.pi/180  # steering input in radians
-        v = np.float(speed_input / self.rpm_factor)  # velocity
-        transform = self.player.get_transform()  # https://carla.readthedocs.io/en/latest/python_api/#carla.Transform rotation is yaw it is around center of gravity. Get initital values from last tick
+        """
+        Perform a simulation step.
 
+        :param speed_input: speed input value from the sensor (RPM)
+        :param steering_input: steering input value from the sensor (degrees)
+        :param time_step: time since last tick (milliseconds)
+        """
+        # convert units
+        delta = steering_input*math.pi/180
+        v = np.float(speed_input / self.rpm_factor)
+        transform = self.player.get_transform()
+
+        # Perform the integration
         self.sol.set_f_params(v, delta)
         yaw_rate, b = self.sol.integrate(self.sol.t+time_step/1000)  # return result from differential equytion of single track model motion
 
+        # store results at class level
         self.b = b
         self.yaw += yaw_rate * time_step/1000
 
+        # Move and rotate the actor appropriately
         transform.location.x += v * math.cos(self.yaw)
         transform.location.y += v * math.sin(self.yaw)
         transform.location.z = 0
         transform.rotation.yaw = self.yaw*180/math.pi
-
         self.player.set_transform(transform)
 
 
