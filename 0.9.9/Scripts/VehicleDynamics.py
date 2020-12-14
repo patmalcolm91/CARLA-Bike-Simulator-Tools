@@ -115,14 +115,8 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         super().__init__(actor)
 
         self.rpm_factor = rpm_factor
-        self.throttle = 0
-        self.brake = 0
         self.physics = self.player.get_physics_control()
-        if isinstance(self.player, carla.Vehicle):
-            self._control = carla.VehicleControl()
-        else:
-            raise NotImplementedError("Actor type not supported")
-        self.player.apply_physics_control(self.physics)
+        self.player.set_simulate_physics(False)
 
         self.b = 0.0  # side slip angle
         self.yaw = start_yaw
