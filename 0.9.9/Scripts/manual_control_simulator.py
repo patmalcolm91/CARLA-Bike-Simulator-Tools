@@ -217,13 +217,17 @@ class World(object):
 # controller.
 
 class DualControl(object):
-    def __init__(self, world):
+    def __init__(self, world, dynamics_model="single-track"):
         self.keyboard_control_mode = False
         self._steer_cache = 0.0
-        self._vehicle_dynamics = VehicleDynamicsPaul(world.player, steering_scale=135)
-        self._bike_dynamics = VehicleDynamicsSingleTrack(world.player)
+        self._dynamics_model = dynamics_model
+        if self._dynamics_model == "paul":
+            self._vehicle_dynamics_paul = VehicleDynamicsPaul(world.player, steering_scale=135)
+        elif self._dynamics_model == "single-track":
+            self._vehicle_dynamics_single_track = VehicleDynamicsSingleTrack(world.player)
+        else:
+            raise NotImplementedError("Invalid dynamics model specified in DualControl.")
         self._keyboard_vehicle_dynamics = VehicleDynamicsKeyboard(world.player)
-        self.sim_model = "bike"
 
     def parse_events(self, world, clock, bike_sensor):
         for event in pygame.event.get():
@@ -255,10 +259,10 @@ class DualControl(object):
         # request sensor outputs from arduino
         speed, steering = bike_sensor.get_speed_and_steering()
         # send the sensor readings to the vehicle dynamics module
-        if self.sim_model == "bike":
-            self._bike_dynamics.tick(speed_input=speed, steering_input=steering, time_step=clock.get_time())
-        else:
-            self._vehicle_dynamics.tick(speed_input=speed, steering_input=steering)
+        if self._dynamics_model == "single-track":
+            self._vehicle_dynamics_single_track.tick(speed_input=speed, steering_input=steering, time_step=clock.get_time())
+        elif self._dynamics_model == "paul":
+            self._vehicle_dynamics_paul.tick(speed_input=speed, steering_input=steering)
 
     @staticmethod
     def _is_quit_shortcut(key):
