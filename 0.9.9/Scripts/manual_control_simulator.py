@@ -256,7 +256,7 @@ class DualControl(object):
         speed, steering = bike_sensor.get_speed_and_steering()
         # send the sensor readings to the vehicle dynamics module
         if self.sim_model == "bike":
-            self._bike_dynamics.tick(speed_input=speed, steering_input=steering, milliseconds=clock.get_time())
+            self._bike_dynamics.tick(speed_input=speed, steering_input=steering, time_step=clock.get_time())
         else:
             self._vehicle_dynamics.tick(speed_input=speed, steering_input=steering)
 
