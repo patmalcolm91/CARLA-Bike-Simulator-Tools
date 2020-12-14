@@ -80,6 +80,44 @@ class BikeSensor:
         self.socket.close()
 
 
+class DummyBikeSensor(BikeSensor):
+    """
+    A dummy bike sensor emulator for simple testing purposes.
+    Ramps speed up from zero to a set value and then holds it there.
+    Moves steering back and forth linearly within a set range.
+    """
+    def __init__(self, *args, **kwargs):
+        self.speed = 0
+        self.max_speed = 1600
+        self.speed_step = 40
+        self.steering = 0
+        self.max_steering = 45
+        self.steering_step = 1
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def __del__(self):
+        pass
+
+    def _update_values(self):
+        self.speed = min(self.speed + self.speed_step, self.max_speed)
+        if self.steering_step > 1:
+            self.steering = min(self.steering + self.steering_step, self.max_steering)
+        else:
+            self.steering = max(self.steering - self.steering_step, -self.max_steering)
+        if abs(self.steering) >= self.max_steering:
+            self.steering_step *= -1
+
+    def get_speed_and_steering(self):
+        speed, steering = self.speed, self.steering
+        self._update_values()
+        return speed, steering
+
+
 if __name__ == "__main__":
     # Initialize sensor
     sensor = BikeSensor()
