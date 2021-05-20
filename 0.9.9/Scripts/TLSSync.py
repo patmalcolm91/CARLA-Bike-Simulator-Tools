@@ -9,6 +9,7 @@ from matplotlib import transforms
 import SumoNetVis
 from shapely.geometry import Point
 import yaml
+import argparse
 
 import carla
 import traci
@@ -115,9 +116,25 @@ class TLSSync:
 
 
 if __name__ == "__main__":
-    client = carla.Client("localhost", 2000)
-    client.load_world("Town04")
-    NET_FILE = "/home/patrick/Desktop/carla-dev/Co-Simulation/Sumo/examples/net/Town04.net.xml"
-    tls_sync = TLSSync(client.get_world(), NET_FILE, config_file="tls.yaml")
-    tls_sync.plot()
-    plt.show()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run", action="store_true")
+    parser.add_argument("--carla_host", type=str, default="localhost")
+    parser.add_argument("--carla_port", type=int, default=2000)
+    parser.add_argument("--net", type=str, required=True, help="Path to SUMO net file.")
+    parser.add_argument("--config", type=str, required=True, help="Path to TLS YAML config file.")
+    parser.add_argument("--traci_port", type=int, default=8813)
+    parser.add_argument("--traci_client_order", type=int, default=99)
+    args = parser.parse_args()
+    client = carla.Client(args.carla_host, args.carla_port)
+    # client.load_world("Town04")
+    tls_sync = TLSSync(client.get_world(), args.net, config_file=args.config)
+    if args.run:
+        traci.init(port=args.traci_port, label="Carla_TLSSync")
+        cxn = traci.getConnection("Carla_TLSSync")
+        cxn.setOrder(args.traci_client_order)
+        while True:
+            tls_sync.tick()
+            traci.simulationStep()
+    else:
+        tls_sync.plot()
+        plt.show()
