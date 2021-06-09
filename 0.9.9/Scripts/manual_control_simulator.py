@@ -297,14 +297,14 @@ class HUD(object):
     def __init__(self, width, height):
         self.dim = (width, height)
         font = pygame.font.Font(pygame.font.get_default_font(), 20)
-        font_name = 'courier' if os.name == 'nt' else 'mono'
-        fonts = []
-        for x in pygame.font.get_fonts():
-            if font_name in x:
-                fonts.append(x)
-        default_font = 'ubuntumono'
-        mono = default_font if default_font in fonts else fonts[0]
-        mono = pygame.font.match_font(mono)
+        # font_name = 'courier' if os.name == 'nt' else 'mono'
+        # fonts = []
+        # for x in pygame.font.get_fonts():
+        #     if x is not None and font_name in x:
+        #         fonts.append(x)
+        # default_font = 'ubuntumono'
+        # mono = default_font if default_font in fonts else fonts[0]
+        mono = pygame.font.match_font('ubuntumono')
         self._font_mono = pygame.font.Font(mono, 12 if os.name == 'nt' else 14)
         self._notifications = FadingText(font, (width, 40), (0, height - 40))
         self.server_fps = 0
