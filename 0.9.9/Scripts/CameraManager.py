@@ -42,7 +42,7 @@ class CameraManager(object):
         self._parent = parent_actor
         self.display_size = display_size
         self.resolution = camera_params["resolution"]
-        bound_y = 0.5 + self._parent.bounding_box.extent.y
+        # bound_y = 0.5 + self._parent.bounding_box.extent.y
         attachment = carla.AttachmentType
         self._camera_transforms = [
             (carla.Transform(carla.Location(x=camera_params["camera_x"],
