@@ -21,6 +21,12 @@ from pygame.locals import K_s
 from pygame.locals import K_w
 
 
+import time
+from scipy.integrate import ode
+import numpy as np
+import math
+
+
 class VehicleDynamics:
     """Template class for Vehicle Dynamics."""
     def __init__(self, actor, **kwargs):
@@ -101,6 +107,108 @@ class VehicleDynamicsPaul(VehicleDynamics):
 
         self._control.reverse = self._control.gear < 0
         self.player.apply_control(self._control)
+
+
+class VehicleDynamicsSingleTrack(VehicleDynamics):
+    """
+    Vehicle Dynamics Model implementing Single Track Model
+    developed by Georgios Grigoropoulos and Patrick Malcolm
+
+    For more information on the various parameters of the model, see the full single track model documentation:
+      * Vehicle dynamics by Schramm et al. 2018 (DOI: 10.1007/978-3-662-54483-9)
+      * https://www.coursera.org/lecture/intro-self-driving-cars/lesson-5-lateral-dynamics-of-bicycle-model-1Opvo
+      * https://www.bvl.de/files/1951/1988/1852/2239/10.23773-2017_1.pdf
+    """
+    def __init__(self, actor, start_yaw=None, rpm_factor=1600, start_v=0, start_delta=0):
+        """
+        Initialize a VehicleDynamicsSingleTrack instance.
+
+        :param actor: carla actor object to control
+        :param start_yaw: the starting orientation of the actor. If none, will default to actor's yaw.
+        :param rpm_factor: rpm corresponding to 1 m/s
+        :param start_v: starting velocity (should never need overridden)
+        :param start_delta: starting steering input value (should never need overridden)
+        """
+        super().__init__(actor)
+
+        self.rpm_factor = rpm_factor
+        self.player.set_simulate_physics(False)
+
+        self.b = 0.0  # side slip angle
+        if start_yaw is None:
+            self.yaw = self.player.get_transform().rotation.yaw
+        else:
+            self.yaw = start_yaw
+        self.sol = ode(self._single_track_func).set_integrator("dopri5", max_step=0.050)
+        self.sol.set_initial_value([0, self.b]).set_f_params(start_v, start_delta)
+
+        self.L = 0.1  # in m
+        self.f = 0.3  # proportion of width of bike tire in contact with the road surface
+        self.br = 0.032 * self.f
+        self.ka = 20000  # determined experimentally
+        self.c = 0.5 * self.br * self.ka * self.L ** 2  # approximate length of surface covered by the wheel
+        self.cav = self.c  # front wheel cornering stiffness
+        self.cah = self.c  # rear wheel cornering stiffness
+        self.lb = 1.02  # bike body length in meters
+        self.lv = 0.43  # distance from the center of gravity to the front wheel
+        self.lh = self.lb - self.lv  # distances from the center of gravity to the front
+        self.theta = 2.8  # yaw inertia (check Table 11.8 page 315; this value is from Meijaard et al.)
+        self.m_bike = 6  # mass of bike
+        self.m_rider = 65  # mass of rider
+        self.m = self.m_bike + self.m_rider  # mass of bike + mass of rider
+
+    def _single_track_func(self, t, x, v, delta):
+        """
+        Vehicle dynamics by Schramm et al. 2018 (DOI: 10.1007/978-3-662-54483-9)
+
+        :param t: current time
+        :param x: vector of inputs [yaw_rate, side_slip_angle]
+        :param v: velocity
+        :param delta: steering input angle
+        """
+        if v == 0:
+            return [0, 0]  # no change in yaw rate or side slip angle when not moving
+        # define A, B, and u
+        A11 = -(1 / v) * (self.cav * (self.lv ** 2) + self.cah * (self.lh ** 2)) / self.theta
+        A12 = -(self.cav * self.lv - self.cah * self.lh) / self.theta
+        A21 = -1 - (1 / v ** 2) * (self.cav * self.lv - self.cah * self.lh) / self.m
+        A22 = -(1 / v) * (self.cav + self.cah) / self.m
+        B11 = self.cav * self.lv / self.theta
+        B12 = (1 / v) * (self.cav / self.m)
+        A = np.array([[A11, A12], [A21, A22]])
+        B = np.array([B11, B12])
+        u = delta
+        # calculate and return x'=Ax+Bu
+        xprime = np.dot(A, x) + np.dot(B, u)
+        return np.array([xprime[0], xprime[1]])
+
+    def tick(self, speed_input, steering_input, time_step):
+        """
+        Perform a simulation step.
+
+        :param speed_input: speed input value from the sensor (RPM)
+        :param steering_input: steering input value from the sensor (degrees)
+        :param time_step: time since last tick (milliseconds)
+        """
+        # convert units
+        delta = steering_input*math.pi/180
+        v = np.float(speed_input / self.rpm_factor)
+        transform = self.player.get_transform()
+
+        # Perform the integration
+        self.sol.set_f_params(v, delta)
+        yaw_rate, b = self.sol.integrate(self.sol.t+time_step/1000)
+
+        # store results at class level
+        self.b = b
+        self.yaw += yaw_rate * time_step/1000
+
+        # Move and rotate the actor appropriately
+        transform.location.x += v * math.cos(self.yaw)
+        transform.location.y += v * math.sin(self.yaw)
+        transform.location.z = 0
+        transform.rotation.yaw = self.yaw*180/math.pi
+        self.player.set_transform(transform)
 
 
 class VehicleDynamicsKeyboard(VehicleDynamics):
