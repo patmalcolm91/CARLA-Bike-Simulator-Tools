@@ -60,18 +60,6 @@ from DataSync import Server as DataSyncServer
 
 from configparser import ConfigParser
 
-
-import pygame
-from pygame.locals import KMOD_CTRL
-from pygame.locals import K_0
-from pygame.locals import K_9
-from pygame.locals import K_BACKQUOTE
-from pygame.locals import K_BACKSPACE
-from pygame.locals import K_ESCAPE
-from pygame.locals import K_F1
-from pygame.locals import K_c
-from pygame.locals import K_q
-
 import numpy as np
 
 
@@ -115,6 +103,7 @@ class World:
                 dscfg = scenario_cfg["message_servers"]["instruction_images"]
                 self.data_sync_server = DataSyncServer(ip=dscfg["ip"], port=dscfg["port"], fmt=dscfg["fmt"])
                 self.data_sync_instr_image_index = dscfg["index"]
+        self.spectator = self.world.get_spectator()
         self.player = None
         self._player_blueprint_name = "vehicle.diamondback.century"
         self._player_start_pos = None
@@ -154,7 +143,8 @@ class World:
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
 
     def tick(self, clock):
-        # TODO: move observer to position (see simulation_manager.py)
+        actor_transform = self.player.get_transform()
+        self.spectator.set_transform(actor_transform.transform(carla.Vector3D(0, 0, 1.6)))
         if self.data_sync_server is not None:
             msgs = self.data_sync_server.get_messages()
         else:
@@ -166,10 +156,7 @@ class World:
             # TODO: implement instruction display
 
     def destroy(self):
-        actors = [
-            self.camera_manager.sensor,
-            self.collision_sensor.sensor,
-            self.player]
+        actors = [self.player]
         for actor in actors:
             if actor is not None:
                 actor.destroy()
@@ -213,8 +200,6 @@ class Control():
 
 
 def game_loop(args):
-    pygame.init()
-    pygame.font.init()
     world = None
     refresh_rate = int(args.refresh_rate)
     display_size = args.display_size
@@ -229,21 +214,17 @@ def game_loop(args):
         world = World(client.get_world(), args)
         controller = Control(world)
 
-        clock = pygame.time.Clock()
         while True:
-            clock.tick_busy_loop(refresh_rate)
+            clock.tick_busy_loop(refresh_rate)  # TODO: replace with non-pygame function
             if controller.parse_events(world, clock, bike_sensor):
                 return
             world.tick(clock)
             world.render()
-            pygame.display.flip()
 
     finally:
 
         if world is not None:
             world.destroy()
-
-        pygame.quit()
 
 
 # ==============================================================================
