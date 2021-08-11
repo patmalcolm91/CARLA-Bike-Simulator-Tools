@@ -193,7 +193,6 @@ class Control():
 def game_loop(args):
     world = None
     refresh_rate = int(args.refresh_rate)
-    display_size = args.display_size
 
     try:
         logging.info('listening to server %s:%s', args.host, args.port)
@@ -211,7 +210,6 @@ def game_loop(args):
             if controller.parse_events(world, clock, bike_sensor):
                 return
             world.tick(clock)
-            world.render()
 
     finally:
 
