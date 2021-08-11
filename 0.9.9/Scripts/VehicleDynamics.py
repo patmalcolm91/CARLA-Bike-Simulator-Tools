@@ -87,13 +87,9 @@ class VehicleDynamicsPaul(VehicleDynamics):
         #       set brake to how much brake_threshold is exceeded
         # cosmetic: if throttle is 0 set brake to 0
         # store reference brake value
-        if self.throttle != speed_input / self.throttle_scale:
-            if self.throttle - speed_input / self.throttle_scale > self.brake_threshold:
-                self.brake = self.throttle - (speed_input / self.throttle_scale + self.brake_threshold)
-            else:
-                self.brake = 0
-        elif self.throttle == 0:
-            self.brake = 0
+        self.brake = 0
+        if self.throttle - speed_input / self.throttle_scale > self.brake_threshold:
+            self.brake = self.throttle - (speed_input / self.throttle_scale + self.brake_threshold)
         self._control.brake = self.brake
 
         # scale simulator speed output and limit to maximum 1
