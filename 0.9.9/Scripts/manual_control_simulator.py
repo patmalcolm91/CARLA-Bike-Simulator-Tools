@@ -533,7 +533,7 @@ def game_loop(args):
 
         hud = HUD(display_size[0], display_size[1])
         world = World(client.get_world(), hud, args)
-        controller = DualControl(world)
+        controller = DualControl(world, dynamics_model="single-track")
 
         clock = pygame.time.Clock()
         while True:
