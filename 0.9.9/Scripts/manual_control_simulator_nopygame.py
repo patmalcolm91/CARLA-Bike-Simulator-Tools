@@ -43,6 +43,7 @@ import carla
 
 from carla import ColorConverter as cc
 
+import pygame
 import argparse
 import yaml
 import collections
@@ -213,6 +214,7 @@ def game_loop(args):
 
         world = World(client.get_world(), args)
         controller = Control(world)
+        clock = pygame.time.Clock()
 
         while True:
             clock.tick_busy_loop(refresh_rate)  # TODO: replace with non-pygame function
