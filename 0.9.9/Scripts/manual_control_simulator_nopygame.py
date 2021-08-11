@@ -41,8 +41,6 @@ import os  # used to define the display position
 
 import carla
 
-from carla import ColorConverter as cc
-
 import pygame
 import argparse
 import yaml
@@ -56,7 +54,7 @@ import weakref
 import warnings
 
 from BikeSensor import BikeSensor
-from VehicleDynamics import VehicleDynamicsPaul, VehicleDynamicsKeyboard, VehicleDynamicsSingleTrack
+from VehicleDynamics import VehicleDynamicsPaul, VehicleDynamicsSingleTrack
 from DataSync import Server as DataSyncServer
 
 from configparser import ConfigParser
@@ -80,8 +78,6 @@ def get_actor_display_name(actor, truncate=250):
 class World:
     def __init__(self, carla_world, args):
         self.world = carla_world
-        self.display_size = args.display_size  # set up correct display size for CameraManager
-        self.resolution = args.resolution  # set up the correct resolution for CameraManager
         self.actor_role_name = args.rolename  # allow to use a custom player name
 
         # following section was copied from manual_control.py
@@ -119,7 +115,6 @@ class World:
             if "start_yaw" in scenario_cfg["ego"]:
                 self._player_start_yaw = scenario_cfg["ego"]["start_yaw"]
         self._actor_filter = args.filter
-        self.camera_params = {k: getattr(args, k, CameraManager.DEFAULT_PARAMS[k]) for k in CameraManager.DEFAULT_PARAMS}
         self.restart()  # On World instantiation use bicycle and new engine setup
         # self.world.on_tick(hud.on_world_tick)
 
@@ -194,11 +189,6 @@ class Control():
 # ==============================================================================
 # -- game_loop() ---------------------------------------------------------------
 # ==============================================================================
-# The game loop now will instantiate an arduino object that stores the connection
-# to the arduino. A line of code was added before launching the display to set
-# its position. The display got an additional NOFRAME flag. The update rate of
-# the client has been reduced from 60 to 20.
-
 
 def game_loop(args):
     world = None
@@ -232,10 +222,6 @@ def game_loop(args):
 # ==============================================================================
 # -- main() --------------------------------------------------------------------
 # ==============================================================================
-# Three additional arguments have been added: display size, rolename and gamma.
-# Rolename and gamma have been directly adapted from manual_control.py. Display
-# size is based on the existing resolution argument, which use has been slightly
-# repurposed to reflect the decoupling of display size and surface resolution.
 
 def main():
     argparser = argparse.ArgumentParser(
@@ -257,16 +243,6 @@ def main():
         type=int,
         help='TCP port to listen to (default: 2000)')
     argparser.add_argument(
-        '--resolution',
-        metavar='WIDTHxHEIGHT',
-        default='1280x720',
-        help='window resolution (default: 1280x720)')
-    argparser.add_argument(
-        '--display_size',
-        metavar='WIDTHxHEIGHT',
-        default='1920x1080',
-        help='display size (default: 1920x1080)')
-    argparser.add_argument(
         '--filter',
         metavar='PATTERN',
         default='vehicle.*',
@@ -277,11 +253,6 @@ def main():
         default='hero',
         help='actor role name (default: "hero")')
     argparser.add_argument(
-        '--gamma',
-        default=2.2,
-        type=float,
-        help='Gamma correction of the camera (default: 2.2)')
-    argparser.add_argument(
         '--refresh_rate',
         metavar='refresh_rate',
         default=20,
@@ -290,10 +261,6 @@ def main():
         '--config',
         type=str,
         help='Path to YAML config file containing display settings.')
-    argparser.add_argument(
-        '--display_name',
-        metavar='display_name',
-        help='Name of display. Used to get parameters from config file.')
     argparser.add_argument(
         '--scenario_config',
         type=str,
@@ -305,17 +272,10 @@ def main():
         # read config file
         with open(args.config) as f:
             cfg = yaml.load(f, Loader=yaml.Loader)
-        cfg_default_params = cfg.get("default", {})
-        cfg_display_params = cfg.get(args.display_name, {})
-        cfg_params = {**cfg_default_params, **cfg_display_params}
+        cfg_params = cfg.get("default", {})
         # set parameters
-        args.resolution = cfg_params.pop("resolution", args.resolution)
-        args.display_size = cfg_params.pop("display_size", args.display_size)
         for param in cfg_params:
             setattr(args, param, cfg_params[param])
-
-    args.resolution = tuple([int(x) for x in args.resolution.split('x')])
-    args.display_size = tuple([int(x) for x in args.display_size.split('x')])
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
