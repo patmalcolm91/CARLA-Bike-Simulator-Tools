@@ -7,7 +7,7 @@ message_servers:
     index: 1
 ego:
   blueprint: vehicle.diamondback.century
-  role_name: hero
+  role_name: carla0
   start_pos: [0, 0, 2]
   start_yaw: 0
 instruction_images:
