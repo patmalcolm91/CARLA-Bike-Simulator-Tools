@@ -16,3 +16,8 @@ python TLSSync.py --net "/home/tum-vt/CARLA-Bike-Simulator-Tools/0.9.9/Scripts/A
 
 cd /home/tum-vt/CARLA-Bike-Simulator-Tools/0.9.9/Scripts/AtCityStudy2
 python AtCity_Study2.py &
+
+cd /home/tum-vt/Cyclist-Pose-Detection &&
+source ~/anaconda3/etc/profile.d/conda.sh &&
+conda activate posenet-realsense &&
+python record_realsense.py &
