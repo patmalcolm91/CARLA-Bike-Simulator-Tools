@@ -79,6 +79,7 @@ from pygame.locals import K_ESCAPE
 from pygame.locals import K_F1
 from pygame.locals import K_c
 from pygame.locals import K_q
+from pygame.locals import K_r
 
 import numpy as np
 
@@ -230,7 +231,8 @@ class DualControl(object):
         self._keyboard_vehicle_dynamics = VehicleDynamicsKeyboard(world.player)
 
     def parse_events(self, world, clock, bike_sensor):
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        for event in events:
             if event.type == pygame.QUIT:
                 return True
             elif event.type == pygame.KEYUP:
@@ -238,6 +240,8 @@ class DualControl(object):
                     return True
                 elif event.key == K_BACKSPACE:
                     world.restart()
+                elif event.key == K_r:
+                    self._vehicle_dynamics_single_track.reset_position()
                 elif event.key == K_F1:
                     world.hud.toggle_info()
                 elif event.key == K_BACKQUOTE:
@@ -251,7 +255,8 @@ class DualControl(object):
                     self._keyboard_vehicle_dynamics.tick(event, pygame.key.get_pressed(), clock.get_time())
 
         if self.keyboard_control_mode:
-            self._keyboard_vehicle_dynamics.tick(event, pygame.key.get_pressed(), clock.get_time())
+            for event in events:
+                self._keyboard_vehicle_dynamics.tick(event, pygame.key.get_pressed(), clock.get_time())
         else:
             self._parse_vehicle_controller_input(bike_sensor, clock)
 

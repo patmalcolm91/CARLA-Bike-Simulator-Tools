@@ -38,6 +38,10 @@ class VehicleDynamics:
         self.player = actor
         self._kwargs = kwargs
 
+    def reset_position(self):
+        raise NotImplementedError("This VehicleDynamics class has no reset_position functionality.")
+
+
     def tick(self, **kwargs):
         """Function to be called every simulation step."""
         raise NotImplementedError("Child class must override tick() method.")
@@ -127,6 +131,8 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         super().__init__(actor)
         transform = self.player.get_transform()
         self.x, self.y, self.z = transform.location.x, transform.location.y, transform.location.z
+        self._start_x, self._start_y, self._start_z = self.x, self.y, self.z
+        self._start_v, self._start_delta = start_v, start_delta
         if rpm_factor is None:
             _drum_circumference_simulator = 177.165  # in mm (6.975")
             _drum_radius_simulator = (_drum_circumference_simulator / (2 * np.pi)) / 1000
@@ -142,6 +148,7 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
             self.yaw = self.player.get_transform().rotation.yaw
         else:
             self.yaw = start_yaw
+        self._start_yaw = self.yaw
         self.sol = ode(self._single_track_func).set_integrator("dopri5", max_step=0.1)
         self.sol.set_initial_value([0, self.b]).set_f_params(start_v, start_delta)
 
@@ -159,6 +166,12 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
         self.m_bike = 17.3  # mass of bike
         self.m_rider = 65  # mass of rider
         self.m = self.m_bike + self.m_rider  # mass of bike + mass of rider
+
+    def reset_position(self):
+        self.x, self.y, self.z = self._start_x, self._start_y, self._start_z
+        self.yaw = self._start_yaw
+        self.sol = ode(self._single_track_func).set_integrator("dopri5", max_step=0.1)
+        self.sol.set_initial_value([0, self.b]).set_f_params(self._start_v, self._start_delta)
 
     def _single_track_func(self, t, x, v, delta):
         """
