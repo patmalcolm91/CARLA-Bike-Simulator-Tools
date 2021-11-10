@@ -218,14 +218,14 @@ class World(object):
 # controller.
 
 class DualControl(object):
-    def __init__(self, world, dynamics_model="single-track"):
+    def __init__(self, world, dynamics_model="single-track", rpm_factor=None, **dynamics_model_kwargs):
         self.keyboard_control_mode = False
         self._steer_cache = 0.0
         self._dynamics_model = dynamics_model
         if self._dynamics_model == "paul":
-            self._vehicle_dynamics_paul = VehicleDynamicsPaul(world.player, steering_scale=135)
+            self._vehicle_dynamics_paul = VehicleDynamicsPaul(world.player, **{"steering_scale": 135, **dynamics_model_kwargs})
         elif self._dynamics_model == "single-track":
-            self._vehicle_dynamics_single_track = VehicleDynamicsSingleTrack(world.player)
+            self._vehicle_dynamics_single_track = VehicleDynamicsSingleTrack(world.player, rpm_factor=rpm_factor, **dynamics_model_kwargs)  # TODO: default rpm_factor ~= 4144 # AtCity2 test value: 24000
         else:
             raise NotImplementedError("Invalid dynamics model specified in DualControl.")
         self._keyboard_vehicle_dynamics = VehicleDynamicsKeyboard(world.player)
@@ -523,6 +523,13 @@ def game_loop(args):
     refresh_rate = int(args.refresh_rate)
     display_size = args.display_size
 
+    scenario_cfg = {}
+    if args.scenario_config is not None:
+        with open(args.scenario_config) as f:
+            scenario_cfg = yaml.load(f, Loader=yaml.Loader)
+    dynamics_model = scenario_cfg.get("vehicle_dynamics", {}).get("model", "single-track")
+    rpm_factor = scenario_cfg.get("vehicle_dynamics", {}).get("rpm_factor", None)
+
     try:
         logging.info('listening to server %s:%s', args.host, args.port)
         client = carla.Client(args.host, args.port)
@@ -538,7 +545,7 @@ def game_loop(args):
 
         hud = HUD(display_size[0], display_size[1])
         world = World(client.get_world(), hud, args)
-        controller = DualControl(world, dynamics_model="single-track")
+        controller = DualControl(world, dynamics_model=dynamics_model, rpm_factor=rpm_factor)
 
         clock = pygame.time.Clock()
         while True:

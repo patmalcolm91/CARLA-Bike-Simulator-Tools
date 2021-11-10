@@ -50,7 +50,7 @@ class VehicleDynamics:
 class VehicleDynamicsPaul(VehicleDynamics):
     """Vehicle Dynamics Model developed by Paul Pabst in his Master Thesis work."""
     def __init__(self, actor, torque_curve=None, steering_curve=None, max_rpm=500, throttle_scale=1600,
-                 brake_threshold=0.0025, steering_scale=90):
+                 brake_threshold=0.0025, steering_scale=90, **kwargs):
         super().__init__(actor)
         self.throttle = 0
         self.brake = 0
@@ -118,7 +118,7 @@ class VehicleDynamicsSingleTrack(VehicleDynamics):
       * https://www.coursera.org/lecture/intro-self-driving-cars/lesson-5-lateral-dynamics-of-bicycle-model-1Opvo
       * https://www.bvl.de/files/1951/1988/1852/2239/10.23773-2017_1.pdf
     """
-    def __init__(self, actor, start_yaw=None, rpm_factor=None, start_v=0, start_delta=0):
+    def __init__(self, actor, start_yaw=None, rpm_factor=None, start_v=0, start_delta=0, **kwargs):
         """
         Initialize a VehicleDynamicsSingleTrack instance.
 
