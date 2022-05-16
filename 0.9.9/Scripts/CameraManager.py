@@ -4,6 +4,18 @@ Stripped-down camera manager class
 
 
 from __future__ import print_function
+import os
+import glob
+import time
+import sys
+
+try:
+    sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
+        sys.version_info.major,
+        sys.version_info.minor,
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+except IndexError:
+    pass
 
 import carla
 from carla import ColorConverter as cc
